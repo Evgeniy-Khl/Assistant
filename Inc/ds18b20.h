@@ -12,11 +12,12 @@
 #define NO_SKIP_ROM   1
 #define AM2301_IDR    GPIO_IDR_IDR10
 #define OneWR_IDR     GPIO_IDR_IDR11
-#define AM2301_BSRR   GPIO_BSRR_BR10
-#define OneWR_BSRR    GPIO_BSRR_BR11
+#define AM2301_RESET  GPIO_BSRR_BR10
+#define OneWR_RESET   GPIO_BSRR_BR11
 //--------------------------------------------------
 void DelayMicro(__IO uint32_t micros);
 uint8_t oneWire_Reset(void);
+void DHT_port_init(void);
 void oneWire_port_init(void);
 uint8_t oneWire_SearhRom(uint8_t *Addr);
 uint8_t oneWire_ReadBit(void);
@@ -34,6 +35,7 @@ void displ_status(void);
 void displ_T(void);
 void temperature_check(void);
 uint8_t dallas_crc8(uint8_t * data, uint8_t size);
+uint8_t startDHT(uint8_t cn);
 uint8_t readDHT(uint8_t cn);
 void DS2450_check(void);
 uint8_t DS2450_reset(void);

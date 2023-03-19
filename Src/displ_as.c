@@ -5,7 +5,7 @@
 #include "my.h"
 
 extern char buffTFT[];
-extern uint8_t displ_num, oneWire_amount, ds18b20_num, familycode[][8], newButt, Y_txt, X_left, Y_top, Y_bottom;
+extern uint8_t displ_num, oneWire_amount, fc28H, ds18b20_num, familycode[][8], newButt, Y_txt, X_left, Y_top, Y_bottom;
 extern int16_t result[], fillScreen;
 extern int8_t newcorrection, correction[MAX_DEVICE];
 
@@ -36,15 +36,16 @@ void displT_11x18(){
     }
     else X_left = X_left + 105;
   }
-  Y_txt = Y_bottom - 18; X_left=5;
+  X_left=5;
   sprintf(buffTFT,"MAX=%.1f  MIN=%.1f  MID=%.1f",(float)max_t/10,(float)min_t/10,(float)midl_t/amnt/10);
-  ILI9341_WriteString(X_left, Y_txt, buffTFT, Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
+  ILI9341_WriteString(X_left, Y_bottom-5, buffTFT, Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
 }
 
 void displT_16x26(){
  uint8_t item, amnt=0;
  uint16_t color_txt;
  int16_t max_t=-550, min_t=1270, midl_t=0;
+ 
   for (item = 0; item < oneWire_amount; item++){
     if (result[item]<1270) max_t = max(max_t,result[item]);
     if (result[item]>-550) min_t = min(min_t,result[item]);
@@ -60,34 +61,36 @@ void displT_16x26(){
     } 
     else X_left = X_left + 160;
   }
-  Y_txt = Y_bottom - 26; X_left=5;
-  sprintf(buffTFT,"MAX=%.1f  MIN=%.1f  MID=%.1f",(float)max_t/10,(float)min_t/10,(float)midl_t/amnt/10);
-  ILI9341_WriteString(X_left, Y_txt, buffTFT, Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
+  if(min_t==1270) fc28H=0;
+  X_left=5;
+  if(fc28H){
+    sprintf(buffTFT,"MAX=%.1f  MIN=%.1f  MID=%.1f",(float)max_t/10,(float)min_t/10,(float)midl_t/amnt/10);
+    ILI9341_WriteString(X_left, Y_bottom-5, buffTFT, Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
+  }
 }
 //--------- температуры всех датчиков ----------------------
-void displ_as_0(void){
-  Y_txt = Y_top; X_left = 5; 
+void displ_as_0(void){ 
   if (newButt){
     newButt = 0;
     ILI9341_FillRectangle(0, Y_txt, ILI9341_WIDTH, ILI9341_HEIGHT, fillScreen);
-    initializeButtons(4,1,45);// четыре колонки; одна строка; высота 45
+    initializeButtons(4,1,25);// четыре колонки; одна строка; высота 25
     drawButton(ILI9341_BLUE, 0, "Полный");
     drawButton(ILI9341_GREEN, 1, "<");
     drawButton(ILI9341_GREEN, 2, ">");
     drawButton(ILI9341_MAGENTA, 3, "Корр.");
   }
-  ILI9341_WriteString(X_left+60, Y_txt, "режим АССИСТЕНТ", Font_11x18, ILI9341_YELLOW, fillScreen);
-  Y_txt = Y_txt+18+5;
+//  ILI9341_WriteString(X_left+60, Y_txt, "режим АССИСТЕНТ", Font_11x18, ILI9341_YELLOW, fillScreen);
+//  Y_txt = Y_txt+18+5;
   if (oneWire_amount > 8) displT_11x18(); else displT_16x26();
 }
 //--------- статус датчика ----------------------------------
 void displ_as_1(void){
  uint8_t i = ds18b20_num;
-  Y_txt = Y_top; X_left = 5;
+//  Y_txt = Y_top; X_left = 5;
   if (newButt){
     newButt = 0;
     ILI9341_FillRectangle(0, Y_txt, ILI9341_WIDTH, ILI9341_HEIGHT, fillScreen);
-    initializeButtons(4,1,45);// четыре колонки; одна строка; высота 45
+    initializeButtons(4,1,25);// четыре колонки; одна строка; высота 25
     drawButton(ILI9341_BLUE, 0, "Кратко");
     drawButton(ILI9341_GREEN, 1, "<");
     drawButton(ILI9341_GREEN, 2, ">");
@@ -117,11 +120,11 @@ void displ_as_1(void){
 //--------- корекция датчика ----------------------------------
 void displ_as_2(void){
  uint8_t i = ds18b20_num;
-  Y_txt = Y_top; X_left = 5;
+//  Y_txt = Y_top; X_left = 5;
   if (newButt){
     newButt = 0;
     ILI9341_FillRectangle(0, Y_txt, ILI9341_WIDTH, ILI9341_HEIGHT, fillScreen);
-    initializeButtons(4,1,45);// четыре колонки; одна строка; высота 45
+    initializeButtons(4,1,25);// четыре колонки; одна строка; высота 25
     drawButton(ILI9341_BLUE, 0, "Отм.");
     drawButton(ILI9341_GREEN, 1, "-");
     drawButton(ILI9341_GREEN, 2, "+");
@@ -146,11 +149,11 @@ void displ_as_3(void){
  uint16_t colorTxt;
  extern int16_t max_t, min_t, midl_t;
   max_t=-550; min_t=1270; midl_t=0;
-  Y_txt = Y_top; X_left = 5;
+//  Y_txt = Y_top; X_left = 5;
   if (newButt){
     newButt = 0; newcorrection = 0;
     ILI9341_FillRectangle(0, Y_txt, ILI9341_WIDTH, ILI9341_HEIGHT, fillScreen);
-    initializeButtons(4,1,45);// четыре колонки; одна строка; высота 45
+    initializeButtons(4,1,25);// четыре колонки; одна строка; высота 25
     drawButton(ILI9341_BLUE, 0, "Отм.");
     drawButton(ILI9341_GREEN, 1, "v");
     drawButton(ILI9341_GREEN, 2, "^");
@@ -191,11 +194,11 @@ void displ_as_4(void){
  uint8_t i = ds18b20_num, item, amnt=0;
  extern int16_t max_t, min_t, midl_t;
   max_t=-550; min_t=1270; midl_t=0;
-  Y_txt = Y_top; X_left = 5;
+//  Y_txt = Y_top; X_left = 5;
   if (newButt){
     newButt = 0;
     ILI9341_FillRectangle(0, Y_txt, ILI9341_WIDTH, ILI9341_HEIGHT, fillScreen);
-    initializeButtons(2,1,45);// 2 колонки; одна строка; высота 45
+    initializeButtons(2,1,25);// 2 колонки; одна строка; высота 25
     drawButton(ILI9341_BLUE,  0, "Отмена");
     drawButton(ILI9341_RED,   1, "Запись");
   }
@@ -235,11 +238,11 @@ void displ_as_4(void){
 //--------- ПОДТВЕРЖДЕНИЕ корекции датчика ----------------------------------
 void displ_as_5(void){
  uint8_t i = ds18b20_num;
-  Y_txt = Y_top; X_left = 5;
+//  Y_txt = Y_top; X_left = 5;
   if (newButt){
     newButt = 0;
     ILI9341_FillRectangle(0, Y_txt, ILI9341_WIDTH, ILI9341_HEIGHT, fillScreen);
-    initializeButtons(3,1,45);// 3 колонки; одна строка; высота 45
+    initializeButtons(3,1,25);// 3 колонки; одна строка; высота 25
     drawButton(ILI9341_BLUE,  0, "Отмена");
     drawButton(ILI9341_GREEN, 1, "Особый");
     drawButton(ILI9341_RED,   2, "Запись");

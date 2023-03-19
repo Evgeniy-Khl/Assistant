@@ -21,11 +21,18 @@ micros *= (SystemCoreClock / 1000000) / 8;
 while (micros--) ;
 }
 //--------------------------------------------------
+void DHT_port_init(void){
+  HAL_GPIO_DeInit(GPIOB, GPIO_PIN_10);    // В GPIOx_CRH конфигурируются выводы с 8 по 15
+  GPIOB->CRH |= GPIO_CRH_MODE10;          // 0x3 настроен как выход частота, с которой может он переключаться 50 Mh
+  GPIOB->CRH |= GPIO_CRH_CNF10_0;         // (0x1UL << GPIO_CRH_CNF10_Pos)      /*!< 0x00000400 */ выход с открытым стоком
+  GPIOB->CRH &= ~GPIO_CRH_CNF10_1;        // (0x2UL << GPIO_CRH_CNF10_Pos)      /*!< 0x00000800 */ выход с открытым стоком
+}
+//--------------------------------------------------
 void oneWire_port_init(void){
-  HAL_GPIO_DeInit(GPIOB, GPIO_PIN_11);
-  GPIOB->CRH |= GPIO_CRH_MODE11;
-  GPIOB->CRH |= GPIO_CRH_CNF11_0;
-  GPIOB->CRH &= ~GPIO_CRH_CNF11_1;
+  HAL_GPIO_DeInit(GPIOB, GPIO_PIN_11);    // В GPIOx_CRH конфигурируются выводы с 8 по 15
+  GPIOB->CRH |= GPIO_CRH_MODE11;          // 0x3 настроен как выход частота, с которой может он переключаться 50 Mh
+  GPIOB->CRH |= GPIO_CRH_CNF11_0;         // (0x1UL << GPIO_CRH_CNF11_Pos)      /*!< 0x00004000 */ выход с открытым стоком
+  GPIOB->CRH &= ~GPIO_CRH_CNF11_1;        // (0x2UL << GPIO_CRH_CNF11_Pos)      /*!< 0x00008000 */ выход с открытым стоком
 }
 //-----------------------------------------------
 uint8_t oneWire_SearhRom(uint8_t *Addr){
@@ -93,10 +100,10 @@ uint8_t oneWire_SearhRom(uint8_t *Addr){
 uint8_t oneWire_Reset(void){
   uint8_t status;
   GPIOB->BSRR =GPIO_BSRR_BR11;//низкий уровень (Сбросили 11 бит порта B )
-  //GPIOB->ODR &= ~GPIO_ODR_ODR11;//низкий уровень
+  //GPIOB->ODR &= ~GPIO_ODR_ODR11;//подтяжка к "-"
   DelayMicro(485);//задержка как минимум на 480 микросекунд
   GPIOB->BSRR =GPIO_BSRR_BS11;//высокий уровень (Установили 11 бит порта B )
-  //GPIOB->ODR |= GPIO_ODR_ODR11;//высокий уровень
+  //GPIOB->ODR |= GPIO_ODR_ODR11;//подтяжка к "+"
   DelayMicro(65);//задержка как минимум на 60 микросекунд
   status = (GPIOB->IDR & GPIO_IDR_IDR11 ? 1 : 0);//проверяем уровень
   DelayMicro(500);//задержка как минимум на 480 микросекунд
@@ -277,35 +284,38 @@ void temperature_check(){
 }
 //------- DHT-21 / DHT-11 ------------------------------------------
 uint8_t startDHT(uint8_t cn){
- uint8_t flag=0, status;
-  if (cn) AM2301_GPIO_Port->BSRR = AM2301_BSRR;                      //низкий уровень (Сбросили 10 бит порта B )
-  else AM2301_GPIO_Port->BSRR = OneWR_BSRR;                          //низкий уровень (Сбросили 11 бит порта B )
+ int8_t status;
+ int16_t flag=0;
+  if(cn) GPIOB->BSRR = GPIO_BSRR_BR10;                         //низкий уровень (Сбросили 10 бит порта B )
+  else GPIOB->BSRR = GPIO_BSRR_BR11;                           //низкий уровень (Сбросили 11 бит порта B )
 //#if DHT21==0
 //  HAL_Delay(30); // MCU Sends out Start Signal to DHT and pull down voltage for at least 18ms to let DHT11 detect the signal.
 //#else
-  HAL_Delay(10); // MCU Sends out Start Signal to DHT and pull down voltage for at least 18ms to let DHT21 detect the signal.
+  HAL_Delay(5); // (20->55,5ms) MCU Sends out Start Signal to DHT and pull down voltage for at least 18ms to let DHT21 detect the signal.
 //#endif
-  if (cn) AM2301_GPIO_Port->BSRR = AM2301_BSRR;                      //высокий уровень (Установили 10 бит порта B )
-  else AM2301_GPIO_Port->BSRR = OneWR_BSRR;                          //высокий уровень (Установили 11 бит порта B )
-  DelayMicro(60);// wait for DHT respond 20-40uS
-  if (cn) status = (AM2301_GPIO_Port->IDR & AM2301_IDR ? 1 : 0);     //проверяем уровень
-  else status = (AM2301_GPIO_Port->IDR & OneWR_IDR ? 1 : 0);         //проверяем уровень
+  if(cn) GPIOB->BSRR = GPIO_BSRR_BS10;                         //высокий уровень (Установили 10 бит порта B )
+  else GPIOB->BSRR = GPIO_BSRR_BS11;                           //высокий уровень (Установили 11 бит порта B )
+  DelayMicro(60);// wait for DHT respond 25uS
+  if(cn) status = (GPIOB->IDR & AM2301_IDR ? 1 : 0);           //проверяем уровень
+  else status = (GPIOB->IDR & OneWR_IDR ? 1 : 0);              //проверяем уровень
   if(!status){
-      while(!status){ // low-voltage-level response signal & keeps it for 80us (flag=32 Response to low time finished)
+      while(!status){                                          // low-voltage-level response signal & keeps it for 80us
         flag++;
-        if (cn) status = (AM2301_GPIO_Port->IDR & AM2301_IDR ? 1 : 0);     //проверяем уровень 10 бит порта B
-        else status = (AM2301_GPIO_Port->IDR & OneWR_IDR ? 1 : 0);         //проверяем уровень 11 бит порта B
+//        result[0]=flag;
+        if(cn) status = (GPIOB->IDR & AM2301_IDR ? 1 : 0);     //проверяем уровень 10 бит порта B
+        else status = (GPIOB->IDR & OneWR_IDR ? 1 : 0);        //проверяем уровень 11 бит порта B
       }
-      if(flag<10) return 0;
+      if(flag<100) return 0;
       else {          // hi-voltage-level response signal & keeps it for 80us (flag=55 Response to high time finished)
         flag=0;
         while(status){
           flag++;
-          if (cn) status = (AM2301_GPIO_Port->IDR & AM2301_IDR ? 1 : 0);     //проверяем уровень 10 бит порта B
-          else status = (AM2301_GPIO_Port->IDR & OneWR_IDR ? 1 : 0);         //проверяем уровень 11 бит порта B
+//          result[1]=flag;
+          if(cn) status = (GPIOB->IDR & AM2301_IDR ? 1 : 0);     //проверяем уровень 10 бит порта B
+          else status = (GPIOB->IDR & OneWR_IDR ? 1 : 0);        //проверяем уровень 11 бит порта B
         }
       }
-      if(flag<10) return 0;
+      if(flag<200) return 0;
       else return 1;
   }
   else return 0;
@@ -321,12 +331,12 @@ uint8_t readDHT(uint8_t cn){
           tem[i]<<= 1;
 //        delay_us(30);   // When DHT is sending data to MCU, every bit of data begins with the 50us low-voltage-level
                           // and the length of the following high-voltage-level signal determines whether data bit is "0" or "1"         
-          if (cn) status = (AM2301_GPIO_Port->IDR & AM2301_IDR ? 1 : 0);     //проверяем уровень 10 бит порта B
-          else status = (AM2301_GPIO_Port->IDR & OneWR_IDR ? 1 : 0);         //проверяем уровень 11 бит порта B
+          if(cn) status = (AM2301_GPIO_Port->IDR & AM2301_IDR ? 1 : 0);     //проверяем уровень 10 бит порта B
+          else status = (AM2301_GPIO_Port->IDR & OneWR_IDR ? 1 : 0);        //проверяем уровень 11 бит порта B
           while(!status){   // ожидаем фронт сигнала
             flag++;
-            if (cn) status = (AM2301_GPIO_Port->IDR & AM2301_IDR ? 1 : 0);     //проверяем уровень 10 бит порта B
-            else status = (AM2301_GPIO_Port->IDR & OneWR_IDR ? 1 : 0);         //проверяем уровень 11 бит порта B
+            if(cn) status = (AM2301_GPIO_Port->IDR & AM2301_IDR ? 1 : 0);     //проверяем уровень 10 бит порта B
+            else status = (AM2301_GPIO_Port->IDR & OneWR_IDR ? 1 : 0);        //проверяем уровень 11 бит порта B
           }
           DelayMicro(32);   //26-28u voltage-length means data "0" / 70u voltage-length means data "1"
           flag=0;
@@ -419,7 +429,7 @@ uint8_t DS2450_reset(){
            byte = oneWire_ReadByte(); // read-back for simple verification (0x08)
            if (byte==0x08) ok++;
            
-           oneWire_WriteByte(0x00); // Load data byte (0x01) in address (0x0009+2j) (Setting IR to 1 [5.1 V])
+           oneWire_WriteByte(0x00);   // Load data byte (0x01) in address (0x0009+2j) (Setting IR to 1 [5.1 V])
            byte = oneWire_ReadByte(); // Read byte LOW CRC16
            byte = oneWire_ReadByte(); // Read byte HI CRC16
            byte = oneWire_ReadByte(); // read-back for simple verification (0x01)

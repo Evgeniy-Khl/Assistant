@@ -8,4 +8,5 @@
 
 void checkButtons_cl(uint8_t item);
 void checkButtons_as(uint8_t item);
+void checkButtons_ADC(uint8_t item);
 #endif /* BUTTONS_H_ */

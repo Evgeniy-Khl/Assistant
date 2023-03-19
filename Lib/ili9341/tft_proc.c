@@ -37,7 +37,7 @@ void WindowDraw(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t setcolo
   ILI9341_WriteString(x+(w-11)/2, y+(h-18)/2, str, Font_11x18, strColor, setcolor);
 }
 
-void initializeButtons(uint8_t col, uint8_t row, uint8_t h)// высота кнопки
+void initializeButtons(uint8_t col, uint8_t row, uint8_t h) // h -> высота кнопки
 {
   uint8_t i,j,indx;
   uint16_t x, y, w;
@@ -51,19 +51,17 @@ void initializeButtons(uint8_t col, uint8_t row, uint8_t h)// высота кнопки
   if(h<20) h=20;
   y = ILI9341_HEIGHT - h - 4;      // верхний контур кнопки
   indx = 0;
-  for (j=0; j<row; j++)
-   {
+  for (j=0; j<row; j++){
     x = 4;// начало 1 кнопки
-    for (i=0; i<col; i++)
-      {
+    for (i=0; i<col; i++){
         buttons[indx].x = x+i*(w+8);// интервал между кнопками по горизонтали
         buttons[indx].w = w;
         buttons[indx].h = h;
         buttons[indx].y = y;
         indx++;
-      }
-    y -= (h*(row-1)+4);// интервал между кнопками по вертикали
-   }
+    }
+    y -= (h+4);// интервал между кнопками по вертикали
+  }
   Y_bottom = y;// нижн€€ граница до которой можно закрашивать экран
   buttonAmount = col * row;// обшее количество кнопок
 }

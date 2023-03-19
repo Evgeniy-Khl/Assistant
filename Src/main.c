@@ -29,6 +29,7 @@
 #include "ili9341_touch.h"
 #include "ds18b20.h"
 #include "displ_as.h"
+#include "displ_adc.h"
 #include "buttons.h"
 #include "my.h"
 /* USER CODE END Includes */
@@ -56,16 +57,18 @@ SPI_HandleTypeDef hspi1;
 SPI_HandleTypeDef hspi2;
 
 TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
 const float A1=1.6, A2=0.64, A3=0.04;  // порядок a=0.8 (A1=2a; A2=a^2; A3=(1-a)^2)
 char txt[10], buffTFT[60];
 uint8_t displ_num=0, newButt=1, ticTimer, ticTouch, show, showADC, Y_txt=5, X_left=5, Y_top, Y_bottom=ILI9341_HEIGHT-22, buttonAmount, secTick;
 uint8_t noname, fc20H, fc28H, familycode[MAX_DEVICE][8]={0};
-int8_t oneWire_amount, ds18b20_num, numSet=0, numDate=0, newDate=0, resetDispl=0, newcorrection, correction[MAX_DEVICE];
+int8_t oneWire_amount, ds18b20_num, ds2450_num, numSet=0, numDate=0, newDate=0, resetDispl=0, newcorrection, correction[MAX_DEVICE];
 int16_t result[MAX_DEVICE]={199}, max_t, min_t, midl_t, val_t, pvT, pvRH;
 uint16_t touch_x, touch_y;
 uint16_t fillScreen = ILI9341_BLACK;
+extern uint16_t prescale;
 uint32_t checkButt;
 float PVold1, PVold2;
 struct ram_structure {int x,y; char w,h;} buttons[4];
@@ -79,15 +82,15 @@ static void MX_SPI1_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_RTC_Init(void);
 static void MX_ADC1_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
-void displADC(uint8_t dev);
+void home_screen(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-  if(htim->Instance == TIM1) //check if the interrupt comes from TIM1 (10 ms)
-  {
+  if(htim->Instance == TIM1){ //check if the interrupt comes from TIM1 (10 ms)
     checkButt++;
     if (ticTouch){ --ticTouch; HAL_GPIO_WritePin(Touch_GPIO_Port, Touch_Pin, GPIO_PIN_SET);}// индикация нажатия
     else {HAL_GPIO_WritePin(Touch_GPIO_Port, Touch_Pin, GPIO_PIN_RESET);}
@@ -95,6 +98,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 //      if (set[3]&1) HAL_GPIO_WritePin(Alarm_GPIO_Port, Alarm_Pin, GPIO_PIN_SET); // включить тревогу
 //    }
 //    else HAL_GPIO_WritePin(Alarm_GPIO_Port, Alarm_Pin, GPIO_PIN_RESET);
+  }
+  if(htim->Instance == TIM1){
+    if(prescale){__HAL_TIM_SET_PRESCALER(&htim2, prescale); prescale = 0;}
   }
 }
 uint16_t LowPassF2(uint16_t pv){
@@ -139,146 +145,120 @@ int main(void)
   MX_TIM1_Init();
   MX_RTC_Init();
   MX_ADC1_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 //------------------------------------- Локальные переменные -----------
   uint8_t item;
   uint16_t adcVal;
   float uVal;
 //------------------------------------- Запуск прерываний -----------
-  HAL_TIM_Base_Start_IT(&htim1);          /* ------  таймер 5Гц.   период 200 мс.  ----*/
+  HAL_TIM_Base_Start_IT(&htim1);          /* ------  таймер 100Гц.  период  10 мс.  ----*/
+  HAL_TIM_Base_Start_IT(&htim2);          /* ------  таймер  5Гц.   период 200 мс.  ----*/
   HAL_RTCEx_SetSecond_IT(&hrtc);          // Sets Interrupt for second
   HAL_ADCEx_Calibration_Start(&hadc1);    // калибровкa АЦП
-  //  HAL_GPIO_WritePin(GPIOA, Alarm_Pin, GPIO_PIN_SET);  // LED_PC13=OFF
-  
-//------------------------------------- НАЧАЛЬНЫЙ экран ----------------  
+  //HAL_GPIO_WritePin(GPIOA, Alarm_Pin, GPIO_PIN_SET);  // LED_PC13=OFF
   TFT_init();
-  oneWire_port_init();
-  item = oneWire_count(MAX_DEVICE);       // проверяем наличие датчиков если item = 0 датчики найдены
-  //oneWire_amount = 21;
-  if (oneWire_amount){
-    sprintf(buffTFT,"Количество 1-Wire: %d шт.",oneWire_amount);
-    ILI9341_WriteString(5, Y_txt, buffTFT, Font_11x18, ILI9341_CYAN, ILI9341_BLACK);
-    Y_txt = Y_txt+18+5;
-//    for (item=0; item<oneWire_amount; item++){
-//      sprintf(buffTFT,"%2x %2x %2x %2x %2x %2x %2x %2x",familycode[item][0],familycode[item][1],familycode[item][2],familycode[item][3],familycode[item][4],familycode[item][5],familycode[item][6],familycode[item][7]);
-//      ILI9341_WriteString(5, Y_txt, buffTFT, Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
-//      Y_txt = Y_txt+10+5;
-//    }
-//    HAL_Delay(5000);
-    if (fc28H){
-      sprintf(buffTFT,"Количество ds18b20: %d шт.",fc28H);
-      ILI9341_WriteString(5, Y_txt, buffTFT, Font_11x18, ILI9341_CYAN, ILI9341_BLACK);
-      Y_txt = Y_txt+18+5;
-      ds18b20_Convert_T();        // первое измерение температуры
-    }
-    if (fc20H){
-      item = DS2450_reset();
-      adcVal = ILI9341_GREEN;
-      sprintf(buffTFT,"Количество ds2450: %d / %d шт.",fc20H,item);
-      if (fc28H-item>0) adcVal = ILI9341_RED; 
-      ILI9341_WriteString(5, Y_txt, buffTFT, Font_11x18, adcVal, ILI9341_BLACK);
-      Y_txt = Y_txt+18+5;
-    }
-    if (noname){
-      sprintf(buffTFT,"Количество NONAME: %d шт.",noname);
-      ILI9341_WriteString(5, Y_txt, buffTFT, Font_11x18, ILI9341_CYAN, ILI9341_BLACK);
-      Y_txt = Y_txt+18+5;
-    }
-  }
-//-----------------------------------------------------------------------  
-//  HAL_ADC_Start(&hadc1);
-//  HAL_ADC_PollForConversion(&hadc1,100);
-//  adcVal = ((float)HAL_ADC_GetValue(&hadc1));
-//  HAL_ADC_Stop(&hadc1);
-//  if (adcVal>0){
-//    PVold2 = PVold1 = adcVal;
-//    sprintf(buffTFT,"ADC значение: %4i",adcVal);
-//    ILI9341_WriteString(5, Y_txt, buffTFT, Font_11x18, ILI9341_CYAN, ILI9341_BLACK);
-//    Y_txt = Y_txt+18+5;
-//  }
-  
-  HAL_Delay(2000);
-//------------------------------------- ОЧИСТКА экрана -------------------
-  ILI9341_FillScreen(fillScreen);
-  Y_txt = 5; X_left = 5;
+  home_screen();                      // проверка подключенных датчиков
+  ILI9341_FillScreen(fillScreen);     // ОЧИСТКА экрана
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  secTick = 0;
+  show = 0;
   while (1){
-    if (fc28H){
-        Y_txt = 5; X_left = 5;        // Y_top = Y_txt;
-//------------------------------------- ТАЧСКРИН ---------------------------
+    Y_txt = 5; X_left = 5;        // Y_top = Y_txt;
+    if(fc20H){                    // DS2450
+        //------------------------------------- ТАЧСКРИН ---------------------------
         if (ILI9341_TouchPressed()&& checkButt>40){
-          //ILI9341_WriteString(X_left, Y_bottom - 22, "TouchPressed!", Font_11x18, ILI9341_MAGENTA, fillScreen);
+//          ILI9341_WriteString(X_left, Y_bottom - 22, "TouchPressed!", Font_11x18, ILI9341_MAGENTA, fillScreen);
           if(ILI9341_TouchGetCoordinates(&touch_x, &touch_y)){
               for (item=0; item<buttonAmount; item++){
                   if(contains(touch_x, touch_y, item)) break; // проверка попадания новой координаты в область кнопки
               }
-              checkButtons_as(item); // проверка нажатой кнопки               
-              if (displ_num) resetDispl=60; else resetDispl = 0;
-              display_as();
+              checkButtons_ADC(item); // проверка нажатой кнопки               
+              displADC();     // отображение информации АЦП
           }
           checkButt = 0;
         }
-//------------------------------------- ОСНОВНОЙ экран ---------------------------
-        // show, secTick are changed in function handles RTC global interrupt -> {void RTC_IRQHandler(void)} in file "stm32f1xx_it.c"
-        if (show){
-            show = 0;
-            temperature_check();  // измерение температуры
-            display_as();         // отображение информации
-        }
-    }
-    else if (fc20H){
-        Y_txt = 5; X_left = 5;        // Y_top = Y_txt;
         if (showADC){
             showADC = 0;
             DS2450_check();
-            displADC(1);     // отображение информации 1-го АЦП 
+            displADC();     // отображение информации АЦП 
         }
     }
-    else {
-        item = 0;//readDHT(0);
-        if (item){
-            ILI9341_WriteString(25, 5, "DHT-21 подключен по линии 1 Wire.", Font_11x18, ILI9341_MAGENTA, ILI9341_BLACK);
-            sprintf(buffTFT,"t=%.1f  RH=%.1f  ",(float)pvT/10,(float)pvRH/10);
-            ILI9341_WriteString(15, Y_txt+18+15, buffTFT, Font_16x26, ILI9341_WHITE, ILI9341_BLACK);
-            HAL_Delay(1000);
+    else if(show){
+        show = 0;
+        if(fc28H){                        // DS18b20
+            //------------------------------------- ТАЧСКРИН ---------------------------
+            if(ILI9341_TouchPressed()&& checkButt>40){
+              //ILI9341_WriteString(X_left, Y_bottom - 22, "TouchPressed!", Font_11x18, ILI9341_MAGENTA, fillScreen);
+              if(ILI9341_TouchGetCoordinates(&touch_x, &touch_y)){
+                  for (item=0; item<buttonAmount; item++){
+                      if(contains(touch_x, touch_y, item)) break; // проверка попадания новой координаты в область кнопки
+                  }
+                  checkButtons_as(item); // проверка нажатой кнопки               
+                  if (displ_num) resetDispl=60; else resetDispl = 0;
+              }
+              checkButt = 0;
+            }
+            //------------------------------------- ОСНОВНОЙ экран ---------------------------
+            //-------- show, secTick are changed in function handles RTC global interrupt -> {void RTC_IRQHandler(void)} in file "stm32f1xx_it.c"
+            temperature_check();  // измерение температуры
+            display_as();         // отображение информации
         }
         else {
-            item = 0;//readDHT(1);
-            if (item){
-              ILI9341_WriteString(25, 5, "DHT-21 подключен по линии AM2301.", Font_11x18, ILI9341_MAGENTA, ILI9341_BLACK);
-              sprintf(buffTFT,"t=%.1f  RH=%.1f  ",(float)pvT/10,(float)pvRH/10);
-              ILI9341_WriteString(15, Y_txt+18+15, buffTFT, Font_16x26, ILI9341_WHITE, ILI9341_BLACK);
-              HAL_Delay(1000);
-            }
-            else {
-              HAL_ADC_Start(&hadc1);
-              HAL_ADC_PollForConversion(&hadc1,100);
-              adcVal = ((float)HAL_ADC_GetValue(&hadc1));
-              HAL_ADC_Stop(&hadc1);              
-              if (adcVal > 10){
-                if (PVold1==0) PVold2 = PVold1 = adcVal;
-                else adcVal = LowPassF2(adcVal);
-                uVal = (float)adcVal*3.35/4096;
-                ILI9341_WriteString(25, 5, "Подключен HIH-5030.", Font_11x18, ILI9341_MAGENTA, ILI9341_BLACK);
-                sprintf(buffTFT,"ADC=%4i",adcVal);
-                ILI9341_WriteString(15, Y_txt+18+15, buffTFT, Font_16x26, ILI9341_WHITE, ILI9341_BLACK);
-                if (uVal > 0.8) sprintf(buffTFT,"V=%.3f  RH=%.1f  ",uVal,(uVal/5-0.1515)/0.00636);
-                else sprintf(buffTFT,"V=%.3f  RH=0  ",uVal);
-                ILI9341_WriteString(15, Y_txt+28+18+15, buffTFT, Font_16x26, ILI9341_WHITE, ILI9341_BLACK);
-                HAL_Delay(1000);
-              }
-              else {
-                PVold2 = PVold1 = 0;
-                ILI9341_WriteString(45, 100, "Датчики ненайдены!", Font_11x18, ILI9341_MAGENTA, ILI9341_BLACK);
-                item = oneWire_count(MAX_DEVICE);   // проверяем наличие датчиков если item = 0 датчики найдены
-                HAL_Delay(1000);
-                ILI9341_FillScreen(fillScreen);
-              }
+            item = readDHT(0);        // DHT-21 подключен по линии 1 Wire
+            if(item){
+                sprintf(buffTFT,"1Wt=%.1f  Rh=%.1f%% ",(float)pvT/10,(float)pvRH/10);
+                ILI9341_WriteString(5, Y_txt, buffTFT, Font_16x26, ILI9341_CYAN, ILI9341_BLACK);
+                Y_txt = Y_txt+26+8;
             }
         }
+        if(fc28H < 9 && displ_num == 0){
+            item = readDHT(1);            // DHT-21 подключен по линии AM2301
+            if (item){
+              sprintf(buffTFT,"Amt=%.1f  Rh=%.1f%% ",(float)pvT/10,(float)pvRH/10);
+              ILI9341_WriteString(5, Y_txt, buffTFT, Font_16x26, ILI9341_CYAN, ILI9341_BLACK);
+              Y_txt = Y_txt+26+8;
+            }
+
+            HAL_ADC_Start(&hadc1);
+            HAL_ADC_PollForConversion(&hadc1,100);
+            adcVal = ((float)HAL_ADC_GetValue(&hadc1));
+            HAL_ADC_Stop(&hadc1);              
+            if (adcVal > 500){
+              if (PVold1==0) PVold2 = PVold1 = adcVal;
+              else adcVal = LowPassF2(adcVal);
+              uVal = (float)adcVal*3.35/4096;
+              
+              if (uVal > 0.8) sprintf(buffTFT,"V=%.3f   Rh=%.1f%% ",uVal,(uVal/5-0.1515)/0.00636);
+              else sprintf(buffTFT,"V=%.3f   RH=0  ",uVal);
+              ILI9341_WriteString(5, Y_txt, buffTFT, Font_16x26, ILI9341_CYAN, ILI9341_BLACK);
+              Y_txt = Y_txt+26+8;
+            }
+            else if(adcVal > 10) {
+              sprintf(buffTFT,"ADC=%4i",adcVal);
+              ILI9341_WriteString(85, Y_txt, buffTFT, Font_16x26, ILI9341_CYAN, ILI9341_BLACK);
+              Y_txt = Y_txt+26+8;
+            }
+            if(Y_txt==5){
+              ILI9341_FillScreen(fillScreen);
+              ILI9341_WriteString(45, 100, "Датчики ненайдены!", Font_11x18, ILI9341_RED, ILI9341_BLACK);
+              Y_txt = Y_txt+18+5;
+              if(fc28H==0){
+                item = oneWire_count(MAX_DEVICE);       // проверяем наличие датчиков если item = 0 датчики найдены
+                ILI9341_WriteString(145, 100, "...", Font_11x18, ILI9341_RED, ILI9341_BLACK);
+                if(item){
+                  newButt = 1;
+                  sprintf(buffTFT,"Количество 1-Wire: %d шт.",oneWire_amount);
+                  ILI9341_WriteString(5, Y_txt, buffTFT, Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
+                  Y_txt = Y_txt+18+5;
+                  HAL_Delay(2000);
+                }
+              }
+            }
+      }
     }
     /* USER CODE END WHILE */
 
@@ -503,9 +483,9 @@ static void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 1 */
   htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 7199;
+  htim1.Init.Prescaler = 719;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 1999;
+  htim1.Init.Period = 999;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -527,6 +507,51 @@ static void MX_TIM1_Init(void)
   /* USER CODE BEGIN TIM1_Init 2 */
 
   /* USER CODE END TIM1_Init 2 */
+
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 1999;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 7199;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
 
 }
 

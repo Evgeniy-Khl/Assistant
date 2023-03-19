@@ -86,12 +86,12 @@ bool ILI9341_TouchGetCoordinates(uint16_t* x, uint16_t* y) {
 //----------------------------- Uncomment this line to calibrate touchscreen -----------------------------------------------------------
 //    sprintf(buffTFT,"X=%6d Y=%6d",raw_x, raw_y);
 //    ILI9341_WriteString(X_left, Y_bottom - 66, buffTFT, Font_11x18, ILI9341_WHITE, ILI9341_BLACK);    
-#if mode==24
-    *x1 = (raw_x - ILI9341_TOUCH_MIN_RAW_X) * ILI9341_TOUCH_SCALE_X / (ILI9341_TOUCH_MAX_RAW_X - ILI9341_TOUCH_MIN_RAW_X);
+#if mode==24  // текущая установка
+    *x = (raw_x - ILI9341_TOUCH_MIN_RAW_X) * ILI9341_TOUCH_SCALE_X / (ILI9341_TOUCH_MAX_RAW_X - ILI9341_TOUCH_MIN_RAW_X);
     *y = ILI9341_HEIGHT-(raw_y - ILI9341_TOUCH_MIN_RAW_Y) * ILI9341_TOUCH_SCALE_Y / (ILI9341_TOUCH_MAX_RAW_Y - ILI9341_TOUCH_MIN_RAW_Y);
 #elif mode==28
-    *x = (raw_x - ILI9341_TOUCH_MIN_RAW_X) * ILI9341_TOUCH_SCALE_X / (ILI9341_TOUCH_MAX_RAW_X - ILI9341_TOUCH_MIN_RAW_X);
-    *y = (raw_y - ILI9341_TOUCH_MIN_RAW_Y) * ILI9341_TOUCH_SCALE_Y / (ILI9341_TOUCH_MAX_RAW_Y - ILI9341_TOUCH_MIN_RAW_Y);
+    *x = (raw_x - ILI9341_TOUCH_MIN_RAW_X) * ILI9341_TOUCH_SCALE_X / (ILI9341_TOUCH_MAX_RAW_X - ILI9341_TOUCH_MIN_RAW_X)-25;
+    *y = (raw_y - ILI9341_TOUCH_MIN_RAW_Y) * ILI9341_TOUCH_SCALE_Y / (ILI9341_TOUCH_MAX_RAW_Y - ILI9341_TOUCH_MIN_RAW_Y)-5;
 #else
     *x = ILI9341_WIDTH-(raw_x - ILI9341_TOUCH_MIN_RAW_X) * ILI9341_TOUCH_SCALE_X / (ILI9341_TOUCH_MAX_RAW_X - ILI9341_TOUCH_MIN_RAW_X);
     *y1 = ILI9341_HEIGHT-(raw_y - ILI9341_TOUCH_MIN_RAW_Y) * ILI9341_TOUCH_SCALE_Y / (ILI9341_TOUCH_MAX_RAW_Y - ILI9341_TOUCH_MIN_RAW_Y);
@@ -100,6 +100,6 @@ bool ILI9341_TouchGetCoordinates(uint16_t* x, uint16_t* y) {
 //------------------------------ Uncomment this line to calibrate touchscreen ---------------------------------------------------------
 //    sprintf(buffTFT,"X=%6d Y=%6d",*x, *y);
 //    ILI9341_WriteString(X_left, Y_bottom - 44, buffTFT, Font_11x18, ILI9341_WHITE, ILI9341_BLACK);    
-
+    ILI9341_DrawPixel(*x, *y, ILI9341_RED);
     return true;
 }
