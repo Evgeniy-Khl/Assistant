@@ -51,6 +51,8 @@
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
 
+IWDG_HandleTypeDef hiwdg;
+
 RTC_HandleTypeDef hrtc;
 
 SPI_HandleTypeDef hspi1;
@@ -83,6 +85,7 @@ static void MX_TIM1_Init(void);
 static void MX_RTC_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_IWDG_Init(void);
 /* USER CODE BEGIN PFP */
 void home_screen(void);
 /* USER CODE END PFP */
@@ -166,7 +169,9 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   secTick = 0;
   show = 0;
+  MX_IWDG_Init();
   while (1){
+    HAL_IWDG_Refresh(&hiwdg);
     Y_txt = 5; X_left = 5;        // Y_top = Y_txt;
     if(fc20H){                    // DS2450
         //------------------------------------- ТАЧСКРИН ---------------------------
@@ -248,14 +253,13 @@ int main(void)
               Y_txt = Y_txt+18+5;
               if(fc28H==0){
                 item = oneWire_count(MAX_DEVICE);       // проверяем наличие датчиков если item = 0 датчики найдены
-                ILI9341_WriteString(145, 100, "...", Font_11x18, ILI9341_RED, ILI9341_BLACK);
-                if(item){
-                  newButt = 1;
-                  sprintf(buffTFT,"Количество 1-Wire: %d шт.",oneWire_amount);
-                  ILI9341_WriteString(5, Y_txt, buffTFT, Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
-                  Y_txt = Y_txt+18+5;
-                  HAL_Delay(2000);
-                }
+//                if(item){
+//                  newButt = 1;
+//                  sprintf(buffTFT,"Количество 1-Wire: %d шт.",oneWire_amount);
+//                  ILI9341_WriteString(5, Y_txt, buffTFT, Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
+//                  Y_txt = Y_txt+18+5;
+//                  HAL_Delay(2000);
+//                }
               }
             }
       }
@@ -279,11 +283,13 @@ void SystemClock_Config(void)
 
   /** Initializes the CPU, AHB and APB busses clocks 
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE
+                              |RCC_OSCILLATORTYPE_LSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
   RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
@@ -355,6 +361,34 @@ static void MX_ADC1_Init(void)
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
+  * @brief IWDG Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_IWDG_Init(void)
+{
+
+  /* USER CODE BEGIN IWDG_Init 0 */
+
+  /* USER CODE END IWDG_Init 0 */
+
+  /* USER CODE BEGIN IWDG_Init 1 */
+
+  /* USER CODE END IWDG_Init 1 */
+  hiwdg.Instance = IWDG;
+  hiwdg.Init.Prescaler = IWDG_PRESCALER_32;
+  hiwdg.Init.Reload = 4095;
+  if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN IWDG_Init 2 */
+
+  /* USER CODE END IWDG_Init 2 */
 
 }
 

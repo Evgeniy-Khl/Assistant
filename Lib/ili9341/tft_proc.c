@@ -13,7 +13,7 @@ void TFT_init(){
   ILI9341_Init();
   ILI9341_FillScreen(fillScreen);
   Y_txt = 5; X_left = 5;
-  ILI9341_WriteString(X_left+25, Y_txt, "Программа Ассистент v 0.2", Font_11x18, ILI9341_YELLOW, fillScreen);
+  ILI9341_WriteString(X_left+25, Y_txt, "Программа Ассистент v 0.3", Font_11x18, ILI9341_YELLOW, fillScreen);
   Y_txt = Y_txt+18+5;
 }
 
