@@ -30,15 +30,18 @@ void displT_11x18(){
     else sprintf(buffTFT,"t%02d=***  ",item+1);
     if (item == ds18b20_num) color_txt = ILI9341_GREEN; else color_txt = ILI9341_WHITE;
     ILI9341_WriteString(X_left, Y_txt, buffTFT, Font_11x18, color_txt, ILI9341_BLACK);
-    if (item==2||item==5||item==8||item==11||item==14||item==17){
-      Y_txt = Y_txt+18+5;
+    if (item==2||item==5||item==8||item==11||item==14||item==17||item==20){
+      Y_txt = Y_txt+18+4;
       X_left = 5;
     }
     else X_left = X_left + 105;
   }
+  if(min_t==1270) fc28H=0;
   X_left=5;
-  sprintf(buffTFT,"MAX=%.1f  MIN=%.1f  MID=%.1f",(float)max_t/10,(float)min_t/10,(float)midl_t/amnt/10);
-  ILI9341_WriteString(X_left, Y_bottom-5, buffTFT, Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
+  if(fc28H){
+    sprintf(buffTFT,"MAX=%.1f  MIN=%.1f  MID=%.1f",(float)max_t/10,(float)min_t/10,(float)midl_t/amnt/10);
+    ILI9341_WriteString(X_left, Y_bottom-3, buffTFT, Font_11x18, ILI9341_YELLOW, ILI9341_BLACK);
+  }
 }
 
 void displT_16x26(){
@@ -65,7 +68,7 @@ void displT_16x26(){
   X_left=5;
   if(fc28H){
     sprintf(buffTFT,"MAX=%.1f  MIN=%.1f  MID=%.1f",(float)max_t/10,(float)min_t/10,(float)midl_t/amnt/10);
-    ILI9341_WriteString(X_left, Y_bottom-5, buffTFT, Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
+    ILI9341_WriteString(X_left, Y_bottom-3, buffTFT, Font_11x18, ILI9341_YELLOW, ILI9341_BLACK);
   }
 }
 //--------- температуры всех датчиков ----------------------

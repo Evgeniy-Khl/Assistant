@@ -15,7 +15,7 @@ void home_screen(void){
   Y_txt = Y_txt+18+5;
   oneWire_port_init();
   item = oneWire_count(MAX_DEVICE);       // проверяем наличие датчиков если item = 0 датчики найдены
-//  oneWire_amount = 21;
+//  oneWire_amount = 24;
   if(oneWire_amount){
     amount++;
     sprintf(buffTFT,"Количество 1-Wire: %d шт.",oneWire_amount);

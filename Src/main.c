@@ -169,9 +169,9 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   secTick = 0;
   show = 0;
-  MX_IWDG_Init();
+  MX_IWDG_Init();                 // инициализация Watchdog (3 сек.)
   while (1){
-    HAL_IWDG_Refresh(&hiwdg);
+    HAL_IWDG_Refresh(&hiwdg);     // обновление Watchdog
     Y_txt = 5; X_left = 5;        // Y_top = Y_txt;
     if(fc20H){                    // DS2450
         //------------------------------------- ТАЧСКРИН ---------------------------
@@ -227,7 +227,6 @@ int main(void)
               ILI9341_WriteString(5, Y_txt, buffTFT, Font_16x26, ILI9341_CYAN, ILI9341_BLACK);
               Y_txt = Y_txt+26+8;
             }
-
             HAL_ADC_Start(&hadc1);
             HAL_ADC_PollForConversion(&hadc1,100);
             adcVal = ((float)HAL_ADC_GetValue(&hadc1));
@@ -242,24 +241,20 @@ int main(void)
               ILI9341_WriteString(5, Y_txt, buffTFT, Font_16x26, ILI9341_CYAN, ILI9341_BLACK);
               Y_txt = Y_txt+26+8;
             }
-            else if(adcVal > 10) {
+            else if(adcVal > 100) {
               sprintf(buffTFT,"ADC=%4i",adcVal);
               ILI9341_WriteString(85, Y_txt, buffTFT, Font_16x26, ILI9341_CYAN, ILI9341_BLACK);
               Y_txt = Y_txt+26+8;
             }
             if(Y_txt==5){
-              ILI9341_FillScreen(fillScreen);
+              ILI9341_FillRectangle(42, 98, 100, 22, ILI9341_BLACK);
               ILI9341_WriteString(45, 100, "Датчики ненайдены!", Font_11x18, ILI9341_RED, ILI9341_BLACK);
               Y_txt = Y_txt+18+5;
+              HAL_Delay(700);
+              ILI9341_FillScreen(fillScreen);
               if(fc28H==0){
                 item = oneWire_count(MAX_DEVICE);       // проверяем наличие датчиков если item = 0 датчики найдены
-//                if(item){
-//                  newButt = 1;
-//                  sprintf(buffTFT,"Количество 1-Wire: %d шт.",oneWire_amount);
-//                  ILI9341_WriteString(5, Y_txt, buffTFT, Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
-//                  Y_txt = Y_txt+18+5;
-//                  HAL_Delay(2000);
-//                }
+                if(fc28H) newButt = 1;
               }
             }
       }
