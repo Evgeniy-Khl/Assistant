@@ -6,7 +6,7 @@
 #include <string.h>
 #include "ili9341.h"
 
-#define VREF 2.55 // напряжение ИОН DS2450
+#define VREF 2.56 // напряжение ИОН DS2450
 
 void displADC(void);
 void displADC_0(void);

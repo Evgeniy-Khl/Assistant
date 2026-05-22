@@ -20,12 +20,6 @@ extern SPI_HandleTypeDef ILI9341_TOUCH_SPI_PORT;
 #define ILI9341_TOUCH_SCALE_X 320
 #define ILI9341_TOUCH_SCALE_Y 240
 
-// to calibrate uncomment UART_Printf line in ili9341_touch.c
-#define ILI9341_TOUCH_MIN_RAW_X 1500
-#define ILI9341_TOUCH_MAX_RAW_X 29000
-#define ILI9341_TOUCH_MIN_RAW_Y 2000
-#define ILI9341_TOUCH_MAX_RAW_Y 30000
-
 // call before initializing any SPI devices
 void ILI9341_TouchUnselect(void);
 void ILI9341_TouchSelect(void);

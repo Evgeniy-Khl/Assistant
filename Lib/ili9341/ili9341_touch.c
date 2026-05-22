@@ -74,7 +74,22 @@ bool ILI9341_TouchGetCoordinates(uint16_t* x, uint16_t* y) {
     ILI9341_TouchUnselect();
 
     if(nsamples < 16) return false;
-
+#if mode==24
+    #define ILI9341_TOUCH_MIN_RAW_X 4000
+    #define ILI9341_TOUCH_MAX_RAW_X 31000
+    #define ILI9341_TOUCH_MIN_RAW_Y 1500
+    #define ILI9341_TOUCH_MAX_RAW_Y 30000
+#elif mode==28
+    #define ILI9341_TOUCH_MIN_RAW_X 1500
+    #define ILI9341_TOUCH_MAX_RAW_X 29000
+    #define ILI9341_TOUCH_MIN_RAW_Y 2000
+    #define ILI9341_TOUCH_MAX_RAW_Y 30000
+#else
+    #define ILI9341_TOUCH_MIN_RAW_X 1500
+    #define ILI9341_TOUCH_MAX_RAW_X 29000
+    #define ILI9341_TOUCH_MIN_RAW_Y 2000
+    #define ILI9341_TOUCH_MAX_RAW_Y 30000
+#endif
     uint32_t raw_x = (avg_x / 16);
     if(raw_x < ILI9341_TOUCH_MIN_RAW_X) raw_x = ILI9341_TOUCH_MIN_RAW_X;
     if(raw_x > ILI9341_TOUCH_MAX_RAW_X) raw_x = ILI9341_TOUCH_MAX_RAW_X;
@@ -83,9 +98,10 @@ bool ILI9341_TouchGetCoordinates(uint16_t* x, uint16_t* y) {
     if(raw_y < ILI9341_TOUCH_MIN_RAW_Y) raw_y = ILI9341_TOUCH_MIN_RAW_Y;
     if(raw_y > ILI9341_TOUCH_MAX_RAW_Y) raw_y = ILI9341_TOUCH_MAX_RAW_Y;
 
-//----------------------------- Uncomment this line to calibrate touchscreen -----------------------------------------------------------
+//----------------------------- Uncomment this line to calibrate touchscreen ------------------------
 //    sprintf(buffTFT,"X=%6d Y=%6d",raw_x, raw_y);
-//    ILI9341_WriteString(X_left, Y_bottom - 66, buffTFT, Font_11x18, ILI9341_WHITE, ILI9341_BLACK);    
+//    ILI9341_WriteString(X_left, Y_bottom - 66, buffTFT, Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
+//---------------------------------------------------------------------------------------------------
 #if mode==24  // текущая установка
     *x = (raw_x - ILI9341_TOUCH_MIN_RAW_X) * ILI9341_TOUCH_SCALE_X / (ILI9341_TOUCH_MAX_RAW_X - ILI9341_TOUCH_MIN_RAW_X);
     *y = ILI9341_HEIGHT-(raw_y - ILI9341_TOUCH_MIN_RAW_Y) * ILI9341_TOUCH_SCALE_Y / (ILI9341_TOUCH_MAX_RAW_Y - ILI9341_TOUCH_MIN_RAW_Y);
@@ -97,9 +113,11 @@ bool ILI9341_TouchGetCoordinates(uint16_t* x, uint16_t* y) {
     *y1 = ILI9341_HEIGHT-(raw_y - ILI9341_TOUCH_MIN_RAW_Y) * ILI9341_TOUCH_SCALE_Y / (ILI9341_TOUCH_MAX_RAW_Y - ILI9341_TOUCH_MIN_RAW_Y);
 #endif
     
-//------------------------------ Uncomment this line to calibrate touchscreen ---------------------------------------------------------
+//------------------------------ Uncomment this line to calibrate touchscreen ----------------------
 //    sprintf(buffTFT,"X=%6d Y=%6d",*x, *y);
-//    ILI9341_WriteString(X_left, Y_bottom - 44, buffTFT, Font_11x18, ILI9341_WHITE, ILI9341_BLACK);    
-    ILI9341_DrawPixel(*x, *y, ILI9341_RED);
+//    ILI9341_WriteString(X_left, Y_bottom - 44, buffTFT, Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
+//------- Красная точка ---------------------
+//    ILI9341_DrawPixel(*x, *y, ILI9341_RED);
+//--------------------------------------------------------------------------------------------------
     return true;
 }

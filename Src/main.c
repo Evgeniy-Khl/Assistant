@@ -51,8 +51,6 @@
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
 
-IWDG_HandleTypeDef hiwdg;
-
 RTC_HandleTypeDef hrtc;
 
 SPI_HandleTypeDef hspi1;
@@ -64,9 +62,9 @@ TIM_HandleTypeDef htim2;
 /* USER CODE BEGIN PV */
 const float A1=1.6, A2=0.64, A3=0.04;  // порядок a=0.8 (A1=2a; A2=a^2; A3=(1-a)^2)
 char txt[10], buffTFT[60];
-uint8_t displ_num=0, newButt=1, ticTimer, ticTouch, show, showADC, Y_txt=5, X_left=5, Y_top, Y_bottom=ILI9341_HEIGHT-22, buttonAmount, secTick;
+uint8_t displ_num=0, newButt=1, ticTimer, ticTouch, show, showADC, Y_txt=5, X_left=5, Y_top, Y_bottom=ILI9341_HEIGHT-22, buttonAmount, secTick, scale=1;
 uint8_t noname, fc20H, fc28H, familycode[MAX_DEVICE][8]={0};
-int8_t oneWire_amount, ds18b20_num, ds2450_num, numSet=0, numDate=0, newDate=0, resetDispl=0, newcorrection, correction[MAX_DEVICE];
+int8_t oneWire_amount, dht_amount, ds18b20_num, ds2450_num, numSet=0, numDate=0, newDate=0, resetDispl=0, newcorrection, correction[MAX_DEVICE];
 int16_t result[MAX_DEVICE]={199}, max_t, min_t, midl_t, val_t, pvT, pvRH;
 uint16_t touch_x, touch_y;
 uint16_t fillScreen = ILI9341_BLACK;
@@ -85,7 +83,6 @@ static void MX_TIM1_Init(void);
 static void MX_RTC_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM2_Init(void);
-static void MX_IWDG_Init(void);
 /* USER CODE BEGIN PFP */
 void home_screen(void);
 /* USER CODE END PFP */
@@ -159,7 +156,8 @@ int main(void)
   HAL_TIM_Base_Start_IT(&htim2);          /* ------  таймер  5Гц.   период 200 мс.  ----*/
   HAL_RTCEx_SetSecond_IT(&hrtc);          // Sets Interrupt for second
   HAL_ADCEx_Calibration_Start(&hadc1);    // калибровкa АЦП
-  //HAL_GPIO_WritePin(GPIOA, Alarm_Pin, GPIO_PIN_SET);  // LED_PC13=OFF
+//  HAL_GPIO_WritePin(GPIOA, Alarm_Pin, GPIO_PIN_SET);  // LED_PC13=OFF
+
   TFT_init();
   home_screen();                      // проверка подключенных датчиков
   ILI9341_FillScreen(fillScreen);     // ОЧИСТКА экрана
@@ -169,9 +167,9 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   secTick = 0;
   show = 0;
-  MX_IWDG_Init();                 // инициализация Watchdog (3 сек.)
+//  MX_IWDG_Init();                 // инициализация Watchdog (3 сек.)
   while (1){
-    HAL_IWDG_Refresh(&hiwdg);     // обновление Watchdog
+//    HAL_IWDG_Refresh(&hiwdg);     // обновление Watchdog
     Y_txt = 5; X_left = 5;        // Y_top = Y_txt;
     if(fc20H){                    // DS2450
         //------------------------------------- ТАЧСКРИН ---------------------------
@@ -186,7 +184,7 @@ int main(void)
           }
           checkButt = 0;
         }
-        if (showADC){
+        if(showADC){
             showADC = 0;
             DS2450_check();
             displADC();     // отображение информации АЦП 
@@ -194,6 +192,7 @@ int main(void)
     }
     else if(show){
         show = 0;
+//        HAL_GPIO_TogglePin(GPIOA, Alarm_Pin);  // LED_PC13=TogglePin
         if(fc28H){                        // DS18b20
             //------------------------------------- ТАЧСКРИН ---------------------------
             if(ILI9341_TouchPressed()&& checkButt>40){
@@ -230,34 +229,34 @@ int main(void)
             HAL_ADC_Start(&hadc1);
             HAL_ADC_PollForConversion(&hadc1,100);
             adcVal = ((float)HAL_ADC_GetValue(&hadc1));
-            HAL_ADC_Stop(&hadc1);              
+            HAL_ADC_Stop(&hadc1);
+            uVal = (float)adcVal*VSENSE;
+            if(X_left>100){Y_txt = Y_txt+26+8; X_left=5;}
             if (adcVal > 500){
               if (PVold1==0) PVold2 = PVold1 = adcVal;
               else adcVal = LowPassF2(adcVal);
-              uVal = (float)adcVal*3.35/4096;
               
-              if (uVal > 0.8) sprintf(buffTFT,"V=%.3f   Rh=%.1f%% ",uVal,(uVal/5-0.1515)/0.00636);
-              else sprintf(buffTFT,"V=%.3f   RH=0  ",uVal);
+              if (uVal > 0.8) sprintf(buffTFT,"V=%.3f   RH=%.1f%% ",uVal,(uVal/VSUPPLY-0.1515)/0.00636);
+              else sprintf(buffTFT,"V=%.3f   RH=0%%  ",uVal);
               ILI9341_WriteString(5, Y_txt, buffTFT, Font_16x26, ILI9341_CYAN, ILI9341_BLACK);
-              Y_txt = Y_txt+26+8;
             }
-            else if(adcVal > 100) {
-              sprintf(buffTFT,"ADC=%4i",adcVal);
-              ILI9341_WriteString(85, Y_txt, buffTFT, Font_16x26, ILI9341_CYAN, ILI9341_BLACK);
-              Y_txt = Y_txt+26+8;
+//            else if(adcVal > 0) {
+//              sprintf(buffTFT,"ADC=%4u  V=%.3f",adcVal, uVal);
+//              ILI9341_WriteString(5, Y_txt, buffTFT, Font_16x26, ILI9341_CYAN, ILI9341_BLACK);
+//            }
+            else {
+              ILI9341_WriteString(5, Y_txt, "                   ", Font_16x26, ILI9341_CYAN, ILI9341_BLACK);
             }
-            if(Y_txt==5){
+            if(fc28H==0){
               ILI9341_FillRectangle(42, 98, 100, 22, ILI9341_BLACK);
-              ILI9341_WriteString(45, 100, "Датчики ненайдены!", Font_11x18, ILI9341_RED, ILI9341_BLACK);
+              ILI9341_WriteString(45, 100, "Датчикыв не знайдено!", Font_11x18, ILI9341_RED, ILI9341_BLACK);
               Y_txt = Y_txt+18+5;
               HAL_Delay(700);
               ILI9341_FillScreen(fillScreen);
-              if(fc28H==0){
-                item = oneWire_count(MAX_DEVICE);       // проверяем наличие датчиков если item = 0 датчики найдены
-                if(fc28H) newButt = 1;
-              }
+              oneWire_count(MAX_DEVICE);       // проверяем наличие датчиков если item = 0 датчики найдены
+              if(fc28H) newButt = 1;
             }
-      }
+        }
     }
     /* USER CODE END WHILE */
 
@@ -278,13 +277,11 @@ void SystemClock_Config(void)
 
   /** Initializes the CPU, AHB and APB busses clocks 
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE
-                              |RCC_OSCILLATORTYPE_LSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
   RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
@@ -356,34 +353,6 @@ static void MX_ADC1_Init(void)
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
-
-}
-
-/**
-  * @brief IWDG Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_IWDG_Init(void)
-{
-
-  /* USER CODE BEGIN IWDG_Init 0 */
-
-  /* USER CODE END IWDG_Init 0 */
-
-  /* USER CODE BEGIN IWDG_Init 1 */
-
-  /* USER CODE END IWDG_Init 1 */
-  hiwdg.Instance = IWDG;
-  hiwdg.Init.Prescaler = IWDG_PRESCALER_32;
-  hiwdg.Init.Reload = 4095;
-  if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN IWDG_Init 2 */
-
-  /* USER CODE END IWDG_Init 2 */
 
 }
 

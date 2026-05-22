@@ -43,8 +43,8 @@ void checkButtons_as(uint8_t item){
       case 3://--------- ãðóïîâàÿ êîðåêöèÿ äàò÷èêîâ -------------------------
         switch (item){
         	case 0: displ_num = 0; newButt = 1; break;
-          case 1: if (++newcorrection>5) newcorrection = 0;	break;
-        	case 2: if (--newcorrection<0) newcorrection = 5;	break;
+          case 1: if (++newcorrection>4) newcorrection = 0;	break;  // ++newcorrection>5
+        	case 2: if (--newcorrection<0) newcorrection = 4;	break;  // newcorrection = 5;
           case 3: 
             newButt = 1;
             if (newcorrection == 5) displ_num = 0; else displ_num = 4;
@@ -57,7 +57,7 @@ void checkButtons_as(uint8_t item){
         	case 0: displ_num = 3; newButt = 1; break;
           case 1:
             ILI9341_FillRectangle(0, Y_top, ILI9341_WIDTH, ILI9341_HEIGHT, fillScreen);
-            ILI9341_WriteString(45, 100, "ÂÛÏÎËÍßÞ ÊÎÐÐÅÊÖÈÞ!", Font_11x18, ILI9341_MAGENTA, ILI9341_BLACK);
+            ILI9341_WriteString(45, 120, "ÂÈÊÎÍÓÞ ÇÀÏÈÑ!", Font_11x18, ILI9341_MAGENTA, ILI9341_BLACK);
             switch (newcorrection){
             	case 0: val_t = result[ds18b20_num];	break;
             	case 1: val_t = max_t; break;
@@ -66,7 +66,7 @@ void checkButtons_as(uint8_t item){
               case 4: val_t = -100; break;
             }
             if (val_t == -100){
-              for (item=0; item<oneWire_amount; item++) ds18b20_WriteScratchpad(item,70,0);
+              for (item=0; item<oneWire_amount; item++) ds18b20_WriteScratchpad(item,0,0);
             }
             else{
            //   Y_txt = 5; X_left = 5;   
@@ -86,14 +86,14 @@ void checkButtons_as(uint8_t item){
         }
       break;
       case 5://--------- ÏÎÄÒÂÅÐÆÄÅÍÈÅ êîððåêöèè äàò÷èêà ----------------------------------
-        switch (item){
-          case 1: newButt=TUNING+1;	break;
-          case 2: newButt=TUNING;  break;
-        }
+//        switch (item){
+//          case 1: newButt=TUNING+1;	break;
+//          case 2: newButt=TUNING;  break;
+//        }
         if (item){
           ILI9341_FillRectangle(0, Y_top, ILI9341_WIDTH, ILI9341_HEIGHT, fillScreen);
-          ILI9341_WriteString(45, 100, "ÂÛÏÎËÍßÞ  ÊÎÐÐÅÊÖÈÞ!", Font_11x18, ILI9341_MAGENTA, ILI9341_BLACK);
-          ds18b20_WriteScratchpad(ds18b20_num, newButt, newcorrection);
+          ILI9341_WriteString(45, 120, "ÂÈÊÎÍÓÞ ÇÀÏÈÑ!", Font_11x18, ILI9341_MAGENTA, ILI9341_BLACK);
+          ds18b20_WriteScratchpad(ds18b20_num, TUNING, newcorrection);
           HAL_Delay(1000);
         }
         displ_num = 1; newButt = 1; item = 10;

@@ -13,7 +13,7 @@ void TFT_init(){
   ILI9341_Init();
   ILI9341_FillScreen(fillScreen);
   Y_txt = 5; X_left = 5;
-  ILI9341_WriteString(X_left+25, Y_txt, "Программа Ассистент v 0.3", Font_11x18, ILI9341_YELLOW, fillScreen);
+  ILI9341_WriteString(X_left+25, Y_txt, "Програма Помычник v 0.3", Font_11x18, ILI9341_YELLOW, fillScreen);
   Y_txt = Y_txt+18+5;
 }
 
@@ -43,7 +43,7 @@ void initializeButtons(uint8_t col, uint8_t row, uint8_t h) // h -> высота кнопк
   uint16_t x, y, w;
   switch (col)                  // ширина кнопки зависит от кол-ва кнопок в строке
    {
-    case 4: w = 72; break;
+    case 4: w = 72+32; break;
     case 3: w = 100; break;
     case 2: w = 150; break;   
     default: w = ILI9341_WIDTH-6;
@@ -55,6 +55,14 @@ void initializeButtons(uint8_t col, uint8_t row, uint8_t h) // h -> высота кнопк
     x = 4;// начало 1 кнопки
     for (i=0; i<col; i++){
         buttons[indx].x = x+i*(w+8);// интервал между кнопками по горизонтали
+        if(col==4){
+          switch (i){
+          	case 0: buttons[indx].x=4; w=72+32; break;
+          	case 1: buttons[indx].x=4+72+32+8; w=72-32; break;
+            case 2: buttons[indx].x=4+72+32+72-32+16; w=72-32; break;
+            case 3: buttons[indx].x=4+72+32+72-32+72-32+24; w=72+32; break;
+          }
+        }
         buttons[indx].w = w;
         buttons[indx].h = h;
         buttons[indx].y = y;

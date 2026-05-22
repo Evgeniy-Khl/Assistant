@@ -144,7 +144,7 @@ void oneWire_WriteByte(uint8_t dt){
   }
 }
 //-----------------------------------------------
-uint8_t oneWire_count(uint8_t amount){
+void oneWire_count(uint8_t amount){
   uint8_t i, dt[8];
   oneWire_amount = 0;
   for(i = 0; i < amount; i++){
@@ -159,7 +159,6 @@ uint8_t oneWire_count(uint8_t amount){
     }
     else break;
   }
-  return 0;
 }
 //-----------------------------------------------
 void ds18b20_Convert_T(){
@@ -273,8 +272,8 @@ void temperature_check(){
         result[item] = -result[0];
       }
       else result[item] =  valT*10/16;
-      crc = buffer.data[2]&TUNING;
-      if (crc==TUNING){correction[item] = buffer.data[3]; result[item] +=correction[item];}// корекция показаний датчика
+//      crc = buffer.data[2]&TUNING;      // TUNING = 170 = 0xAA
+      if (buffer.data[2]==TUNING){correction[item] = buffer.data[3]; result[item] +=correction[item];}// корекция показаний датчика
       else correction[item] = 0;
     }
     else if (++try_cnt > 2) {try_cnt = 0; result[item] = 1990;};// (199) если ошибка более X раз то больше не опрашиваем 
@@ -429,10 +428,10 @@ uint8_t DS2450_reset(){
            byte = oneWire_ReadByte(); // read-back for simple verification (0x08)
            if (byte==0x08) ok++;
            
-           oneWire_WriteByte(0x00);   // Load data byte (0x01) in address (0x0009+2j) (Setting IR to 1 [5.1 V])
+           oneWire_WriteByte(0x00);   // Load data byte (0x00) in address (0x0009+2j) (Setting IR to 0 [2.56V])/(Setting IR to 1 [5.12V])
            byte = oneWire_ReadByte(); // Read byte LOW CRC16
            byte = oneWire_ReadByte(); // Read byte HI CRC16
-           byte = oneWire_ReadByte(); // read-back for simple verification (0x01)
+           byte = oneWire_ReadByte(); // read-back for simple verification (0x00)
            if (byte==0x00) ok++;
           };
         if (ok==9) setup++;

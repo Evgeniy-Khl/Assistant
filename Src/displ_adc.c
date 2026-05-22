@@ -4,7 +4,7 @@
 #include "my.h"
 
 extern char buffTFT[];
-extern uint8_t displ_num, oneWire_amount, ds2450_num, fc20H, familycode[][8], newButt, Y_txt, Y_top, Y_bottom, X_left;
+extern uint8_t displ_num, oneWire_amount, ds2450_num, fc20H, familycode[][8], newButt, Y_txt, Y_top, Y_bottom, X_left, scale;
 extern int16_t result[], fillScreen;
 extern int8_t newcorrection, correction[MAX_DEVICE];
 const char* pertxt[8]={"6.0","4.0","2.0","1.0","0.8","0.4","0.2","0.1"};
@@ -12,8 +12,7 @@ uint8_t Pval, MinVal, MaxVal, period=6;
 int16_t X_val=0, X_txt, prescale=0;
 
 void displADC_0(){
- uint8_t item;
-// uint16_t color_txt;
+ uint8_t item, divider=100; // 256/VREF (2.56-> напряжение ИОН DS2450)
 // int16_t max_t=-550, min_t=1270, midl_t=0;
   
   if (newButt){
@@ -29,8 +28,9 @@ void displADC_0(){
     ILI9341_WriteString(60, 0, buffTFT, Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
   }
   Y_txt = 25;
+  if(ds2450_num) divider=50;  // for ds2450_num=1 and ds2450_num=2 the divider is 50, but for ds2450_num=0 the divider is 100
   for (item = 0; item < 4; item++){
-    sprintf(buffTFT,"V%d=%1.2f  ",item+1 ,(float)result[ds2450_num*4+item]*VREF/256);
+    sprintf(buffTFT,"V%d=%1.2f  ",item+1 ,(float)result[ds2450_num*4+item]/divider); // (Setting IR to 0 [2.56V])
     ILI9341_WriteString(X_left, Y_txt, buffTFT, Font_16x26, ILI9341_WHITE, ILI9341_BLACK);
     if (item==1||item==3||item==5){
       Y_txt = Y_txt+26+8;
