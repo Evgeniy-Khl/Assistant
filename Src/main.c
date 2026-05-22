@@ -60,7 +60,7 @@ TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
-const float A1=1.6, A2=0.64, A3=0.04;  // ������� a=0.8 (A1=2a; A2=a^2; A3=(1-a)^2)
+const float A1=1.6, A2=0.64, A3=0.04;  // a=0.8 (A1=2a; A2=a^2; A3=(1-a)^2)
 char txt[10], buffTFT[60];
 volatile uint8_t displ_num=0, newButt=1, ticTimer, ticTouch, show, showADC, Y_txt=5, X_left=5, Y_top, Y_bottom=ILI9341_HEIGHT-22, buttonAmount, secTick, scale=1;
 uint8_t noname, fc20H, fc28H, familycode[MAX_DEVICE][8]={0};
@@ -94,10 +94,10 @@ void home_screen(void);
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
   if(htim->Instance == TIM1){ //check if the interrupt comes from TIM1 (10 ms)
     checkButt++;
-    if (ticTouch){ --ticTouch; HAL_GPIO_WritePin(Touch_GPIO_Port, Touch_Pin, GPIO_PIN_SET);}// ��������� �������
+    if (ticTouch){ --ticTouch; HAL_GPIO_WritePin(Touch_GPIO_Port, Touch_Pin, GPIO_PIN_SET);}// pressure indication
     else {HAL_GPIO_WritePin(Touch_GPIO_Port, Touch_Pin, GPIO_PIN_RESET);}
 //    if (ticTimer){ --ticTimer;
-//      if (set[3]&1) HAL_GPIO_WritePin(Alarm_GPIO_Port, Alarm_Pin, GPIO_PIN_SET); // �������� �������
+//      if (set[3]&1) HAL_GPIO_WritePin(Alarm_GPIO_Port, Alarm_Pin, GPIO_PIN_SET); // turn on the alarm
 //    }
 //    else HAL_GPIO_WritePin(Alarm_GPIO_Port, Alarm_Pin, GPIO_PIN_RESET);
   }
@@ -149,76 +149,82 @@ int main(void)
   MX_ADC1_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-  // Enable DWT
-  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
-  DWT->CYCCNT = 0;
-  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+  //----------------------------------------------------------------------------
+  // Инициализация модуля DWT (Data Watchpoint and Trace) для STM32.
+  // Используется для организации сверхточных микросекундных задержек через 
+  // аппаратный счетчик тактов процессора (CYCCNT). Это критически важно для 
+  // соблюдения таймингов протокола 1-Wire (DS18B20).
+  //----------------------------------------------------------------------------
+  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk; // Разрешаем использование Trace-модуля
+  DWT->CYCCNT = 0;                                // Сброс счетчика
+  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;            // Включаем счетчик циклов
+
   //-------------------------------------   -----------
   uint8_t item;
   uint16_t adcVal;
   float uVal;
-//------------------------------------- ������ ���������� -----------
-  HAL_TIM_Base_Start_IT(&htim1);          /* ------  ������ 100��.  ������  10 ��.  ----*/
-  HAL_TIM_Base_Start_IT(&htim2);          /* ------  ������  5��.   ������ 200 ��.  ----*/
+//------------------------------------- Triggering interrupts -----------
+  HAL_TIM_Base_Start_IT(&htim1);          /* ------  Timer 100 Hz. Period 10 ms.  ----*/
+  HAL_TIM_Base_Start_IT(&htim2);          /* ------  Timer 5 Hz. Period 200 ms.  ----*/
   HAL_RTCEx_SetSecond_IT(&hrtc);          // Sets Interrupt for second
-  HAL_ADCEx_Calibration_Start(&hadc1);    // ���������a ���
+  HAL_ADCEx_Calibration_Start(&hadc1);    // ADC calibration
 //  HAL_GPIO_WritePin(GPIOA, Alarm_Pin, GPIO_PIN_SET);  // LED_PC13=OFF
 
   TFT_init();
-  home_screen();                      // �������� ������������ ��������
-  ILI9341_FillScreen(fillScreen);     // ������� ������
+  home_screen();                      // checking connected sensors
+  ILI9341_FillScreen(fillScreen);     // Screen cleaning
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   secTick = 0;
   show = 0;
-//  MX_IWDG_Init();                 // ������������� Watchdog (3 ���.)
+//  MX_IWDG_Init();                 // initialization Watchdog (3 sec.)
   while (1){
-//    HAL_IWDG_Refresh(&hiwdg);     // ���������� Watchdog
+//    HAL_IWDG_Refresh(&hiwdg);     // update Watchdog
     Y_txt = 5; X_left = 5;        // Y_top = Y_txt;
     if(fc20H){                    // DS2450
-        //------------------------------------- �������� ---------------------------
+        //------------------------------------- TOUCHSCREEN ---------------------------
         if (ILI9341_TouchPressed()&& checkButt>40){
 //          ILI9341_WriteString(X_left, Y_bottom - 22, "TouchPressed!", Font_11x18, ILI9341_MAGENTA, fillScreen);
           if(ILI9341_TouchGetCoordinates(&touch_x, &touch_y)){
               for (item=0; item<buttonAmount; item++){
-                  if(contains(touch_x, touch_y, item)) break; // �������� ��������� ����� ���������� � ������� ������
+                  if(contains(touch_x, touch_y, item)) break; // checking whether the new coordinate falls within the button area
               }
-              checkButtons_ADC(item); // �������� ������� ������               
-              displADC();     // ����������� ���������� ���
+              checkButtons_ADC(item); // button press check               
+              displADC();     // display of ADC information
           }
           checkButt = 0;
         }
         if(showADC){
             showADC = 0;
             DS2450_check();
-            displADC();     // ����������� ���������� ��� 
+            displADC();     // display of ADC information
         }
     }
     else if(show){
         show = 0;
 //        HAL_GPIO_TogglePin(GPIOA, Alarm_Pin);  // LED_PC13=TogglePin
         if(fc28H){                        // DS18b20
-            //------------------------------------- �������� ---------------------------
+            //------------------------------------- TOUCHSCREEN ---------------------------
             if(ILI9341_TouchPressed()&& checkButt>40){
               //ILI9341_WriteString(X_left, Y_bottom - 22, "TouchPressed!", Font_11x18, ILI9341_MAGENTA, fillScreen);
               if(ILI9341_TouchGetCoordinates(&touch_x, &touch_y)){
                   for (item=0; item<buttonAmount; item++){
-                      if(contains(touch_x, touch_y, item)) break; // �������� ��������� ����� ���������� � ������� ������
+                      if(contains(touch_x, touch_y, item)) break; // checking whether the new coordinate falls within the button area
                   }
-                  checkButtons_as(item); // �������� ������� ������               
+                  checkButtons_as(item); // button press check               
                   if (displ_num) resetDispl=60; else resetDispl = 0;
               }
               checkButt = 0;
             }
-            //------------------------------------- �������� ����� ---------------------------
+            //------------------------------------- MAIN screen ---------------------------
             //-------- show, secTick are changed in function handles RTC global interrupt -> {void RTC_IRQHandler(void)} in file "stm32f1xx_it.c"
-            temperature_check();  // ��������� �����������
-            display_as();         // ����������� ����������
+            temperature_check();  // temperature measurement
+            display_as();         // display of information
         }
         else {
-            item = readDHT(0);        // DHT-21 ��������� �� ����� 1 Wire
+            item = readDHT(0);        // DHT-21 connected by line 1 Wire
             if(item){
                 sprintf(buffTFT,"1Wt=%.1f  Rh=%.1f%% ",(float)pvT/10,(float)pvRH/10);
                 ILI9341_WriteString(5, Y_txt, buffTFT, Font_16x26, ILI9341_CYAN, ILI9341_BLACK);
@@ -226,7 +232,7 @@ int main(void)
             }
         }
         if(fc28H < 9 && displ_num == 0){
-            item = readDHT(1);            // DHT-21 ��������� �� ����� AM2301
+            item = readDHT(1);            // DHT-21 connected by line AM2301
             if (item){
               sprintf(buffTFT,"Amt=%.1f  Rh=%.1f%% ",(float)pvT/10,(float)pvRH/10);
               ILI9341_WriteString(5, Y_txt, buffTFT, Font_16x26, ILI9341_CYAN, ILI9341_BLACK);
@@ -255,11 +261,11 @@ int main(void)
             }
             if(fc28H==0){
               ILI9341_FillRectangle(42, 98, 100, 22, ILI9341_BLACK);
-              ILI9341_WriteString(45, 100, "�������� �� ��������!", Font_11x18, ILI9341_RED, ILI9341_BLACK);
+              ILI9341_WriteString(45, 100, "Датчикыв не знайдено!", Font_11x18, ILI9341_RED, ILI9341_BLACK);
               Y_txt = Y_txt+18+5;
               HAL_Delay(700);
               ILI9341_FillScreen(fillScreen);
-              oneWire_count(MAX_DEVICE);       // ��������� ������� �������� ���� item = 0 ������� �������
+              oneWire_count(MAX_DEVICE);       // We check for the presence of sensors; if item = 0, sensors are found.
               if(fc28H) newButt = 1;
             }
         }
