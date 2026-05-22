@@ -7,6 +7,19 @@
 #include "tft_proc.h"
 
 //--------------------------------------------------
+#define ONEWIRE_PORT  GPIOB
+#define ONEWIRE_PIN   GPIO_PIN_11
+#define DHT_PORT      GPIOB
+#define DHT_PIN       GPIO_PIN_10
+
+#define ONEWIRE_LOW()   ONEWIRE_PORT->BSRR = GPIO_BSRR_BR11
+#define ONEWIRE_HIGH()  ONEWIRE_PORT->BSRR = GPIO_BSRR_BS11
+#define ONEWIRE_READ()  (ONEWIRE_PORT->IDR & GPIO_IDR_IDR11)
+
+#define DHT_LOW()       DHT_PORT->BSRR = GPIO_BSRR_BR10
+#define DHT_HIGH()      DHT_PORT->BSRR = GPIO_BSRR_BS10
+#define DHT_READ()      (DHT_PORT->IDR & GPIO_IDR_IDR10)
+
 #define TUNING        170
 #define SKIP_ROM      0
 #define NO_SKIP_ROM   1

@@ -1,6 +1,4 @@
 #include "ds18b20.h"
-//#include "tft_proc.h"
-//#include "ili9341.h"
 #include "my.h"
 
 //--------------------------------------------------
@@ -15,37 +13,41 @@ extern union {uint8_t data[8]; int16_t val[4];} bufferADC;
 extern int16_t result[], pvT, pvRH;
 
 //--------------------------------------------------
-__STATIC_INLINE void DelayMicro(__IO uint32_t micros){
-micros *= (SystemCoreClock / 1000000) / 8;
-/* Wait till done */
-while (micros--) ;
+void DelayMicro(uint32_t micros) {
+    uint32_t startTick = DWT->CYCCNT;
+    uint32_t delayTicks = micros * (SystemCoreClock / 1000000);
+    while ((DWT->CYCCNT - startTick) < delayTicks);
 }
+
 //--------------------------------------------------
 void DHT_port_init(void){
-  HAL_GPIO_DeInit(GPIOB, GPIO_PIN_10);    // В GPIOx_CRH конфигурируются выводы с 8 по 15
-  GPIOB->CRH |= GPIO_CRH_MODE10;          // 0x3 настроен как выход частота, с которой может он переключаться 50 Mh
-  GPIOB->CRH |= GPIO_CRH_CNF10_0;         // (0x1UL << GPIO_CRH_CNF10_Pos)      /*!< 0x00000400 */ выход с открытым стоком
-  GPIOB->CRH &= ~GPIO_CRH_CNF10_1;        // (0x2UL << GPIO_CRH_CNF10_Pos)      /*!< 0x00000800 */ выход с открытым стоком
+  HAL_GPIO_DeInit(DHT_PORT, DHT_PIN);
+  DHT_PORT->CRH |= GPIO_CRH_MODE10;
+  DHT_PORT->CRH |= GPIO_CRH_CNF10_0;
+  DHT_PORT->CRH &= ~GPIO_CRH_CNF10_1;
 }
+
 //--------------------------------------------------
 void oneWire_port_init(void){
-  HAL_GPIO_DeInit(GPIOB, GPIO_PIN_11);    // В GPIOx_CRH конфигурируются выводы с 8 по 15
-  GPIOB->CRH |= GPIO_CRH_MODE11;          // 0x3 настроен как выход частота, с которой может он переключаться 50 Mh
-  GPIOB->CRH |= GPIO_CRH_CNF11_0;         // (0x1UL << GPIO_CRH_CNF11_Pos)      /*!< 0x00004000 */ выход с открытым стоком
-  GPIOB->CRH &= ~GPIO_CRH_CNF11_1;        // (0x2UL << GPIO_CRH_CNF11_Pos)      /*!< 0x00008000 */ выход с открытым стоком
+  HAL_GPIO_DeInit(ONEWIRE_PORT, ONEWIRE_PIN);
+  ONEWIRE_PORT->CRH |= GPIO_CRH_MODE11;
+  ONEWIRE_PORT->CRH |= GPIO_CRH_CNF11_0;
+  ONEWIRE_PORT->CRH &= ~GPIO_CRH_CNF11_1;
 }
+
 //-----------------------------------------------
 uint8_t oneWire_SearhRom(uint8_t *Addr){
   uint8_t id_bit_number;
   uint8_t last_zero, rom_byte_number, search_result;
   uint8_t id_bit, cmp_id_bit;
   uint8_t rom_byte_mask, search_direction;
-  //проинициализируем переменные
+
   id_bit_number = 1;
   last_zero = 0;
   rom_byte_number = 0;
   rom_byte_mask = 1;
   search_result = 0;
+
 	if (!LastDeviceFlag){
 		oneWire_Reset();
 		oneWire_WriteByte(0xF0);
@@ -77,14 +79,14 @@ uint8_t oneWire_SearhRom(uint8_t *Addr){
 				rom_byte_mask = 1;
 			}
 		}
-  } while(rom_byte_number < 8); // считываем байты с 0 до 7 в цикле
+  } while(rom_byte_number < 8);
+
 	if (!(id_bit_number < 65)){
-	  // search successful so set LastDiscrepancy,LastDeviceFlag,search_result
 		LastDiscrepancy = last_zero;
-		// check for last device
 		if (LastDiscrepancy == 0)	LastDeviceFlag = 1;
 		search_result = 1;	
   }
+
 	if (!search_result || !ROM_NO[0]){
 		LastDiscrepancy = 0;
 		LastDeviceFlag = 0;
@@ -96,60 +98,63 @@ uint8_t oneWire_SearhRom(uint8_t *Addr){
   }	
   return search_result;
 }
+
 //-----------------------------------------------
 uint8_t oneWire_Reset(void){
   uint8_t status;
-  GPIOB->BSRR =GPIO_BSRR_BR11;//низкий уровень (Сбросили 11 бит порта B )
-  //GPIOB->ODR &= ~GPIO_ODR_ODR11;//подтяжка к "-"
-  DelayMicro(485);//задержка как минимум на 480 микросекунд
-  GPIOB->BSRR =GPIO_BSRR_BS11;//высокий уровень (Установили 11 бит порта B )
-  //GPIOB->ODR |= GPIO_ODR_ODR11;//подтяжка к "+"
-  DelayMicro(65);//задержка как минимум на 60 микросекунд
-  status = (GPIOB->IDR & GPIO_IDR_IDR11 ? 1 : 0);//проверяем уровень
-  DelayMicro(500);//задержка как минимум на 480 микросекунд
-  //(на всякий случай подождём побольше, так как могут быть неточности в задержке)
-  return (status ? 1 : 0);//вернём результат
+  ONEWIRE_LOW();
+  DelayMicro(485);
+  ONEWIRE_HIGH();
+  DelayMicro(65);
+  status = (ONEWIRE_READ() ? 1 : 0);
+  DelayMicro(500);
+  return (status ? 1 : 0);
 }
+
 //--------------------------------------------------
 uint8_t oneWire_ReadBit(void){
   uint8_t bit = 0;
-  GPIOB->BSRR =GPIO_BSRR_BR11;//низкий уровень
+  ONEWIRE_LOW();
   DelayMicro(2);
-  GPIOB->BSRR =GPIO_BSRR_BS11;//высокий уровень
+  ONEWIRE_HIGH();
   DelayMicro(13);
-  bit = (GPIOB->IDR & GPIO_IDR_IDR11 ? 1 : 0);//проверяем уровень
+  bit = (ONEWIRE_READ() ? 1 : 0);
   DelayMicro(45);
   return bit;
 }
+
 //-----------------------------------------------
 uint8_t oneWire_ReadByte(void){
   uint8_t data = 0;
   for (uint8_t i = 0; i < 8; i++)
-  data += oneWire_ReadBit() << i;
+    data += oneWire_ReadBit() << i;
   return data;
 }
+
 //-----------------------------------------------
 void oneWire_WriteBit(uint8_t bit){
-  GPIOB->BSRR =GPIO_BSRR_BR11;//низкий уровень
+  ONEWIRE_LOW();
   DelayMicro(bit ? 3 : 65);
-  GPIOB->BSRR =GPIO_BSRR_BS11;//высокий уровень
+  ONEWIRE_HIGH();
   DelayMicro(bit ? 65 : 3);
 }
+
 //-----------------------------------------------
 void oneWire_WriteByte(uint8_t dt){
   for (uint8_t i = 0; i < 8; i++){
     oneWire_WriteBit(dt >> i & 1);
-    //Delay Protection
     DelayMicro(5);
   }
 }
+
 //-----------------------------------------------
 void oneWire_count(uint8_t amount){
   uint8_t i, dt[8];
   oneWire_amount = 0;
+  fc20H = 0; fc28H = 0; noname = 0;
   for(i = 0; i < amount; i++){
     if(oneWire_SearhRom(dt)){
-      memcpy(familycode[oneWire_amount],dt,sizeof(dt));
+      memcpy(familycode[oneWire_amount], dt, 8);
       oneWire_amount++;
       switch (dt[0]){
       	case 0x20: fc20H++; break;  // DS2450
@@ -160,69 +165,61 @@ void oneWire_count(uint8_t amount){
     else break;
   }
 }
+
 //-----------------------------------------------
 void ds18b20_Convert_T(){
   oneWire_Reset();
-  oneWire_WriteByte(0xCC);  //SKIP ROM
-  oneWire_WriteByte(0x44);  //CONVERT T
+  oneWire_WriteByte(0xCC);  // SKIP ROM
+  oneWire_WriteByte(0x44);  // CONVERT T
 }
+
 //----------------------------------------------------------
 void ds18b20_ReadStratcpad(uint16_t y_pos, uint8_t DevNum){
   uint8_t i, crc, dt[8];
-  oneWire_Reset();            // 1 Wire Bus initialization
-	oneWire_WriteByte(0x55);  // Load MATCH ROM [55H] comand
-	for(i = 0; i < 8; i++){oneWire_WriteByte(familycode[DevNum][i]);}
-  oneWire_WriteByte(0xBE);  //READ SCRATCHPAD
-  for(i=0;i<8;i++){dt[i] = oneWire_ReadByte();}
-  crc = oneWire_ReadByte(); // Read CRC byte
-  i = dallas_crc8(dt, 8);
-  if (i==crc){
+  oneWire_Reset();
+	oneWire_WriteByte(0x55);  // MATCH ROM
+	for(i = 0; i < 8; i++){ oneWire_WriteByte(familycode[DevNum][i]); }
+  oneWire_WriteByte(0xBE);  // READ SCRATCHPAD
+  for(i=0; i<8; i++){ dt[i] = oneWire_ReadByte(); }
+  crc = oneWire_ReadByte();
+  if (dallas_crc8(dt, 8) == crc){
     sprintf(buffTFT,"PAD %02X %02X %02X %02X %02X %02X %02X %02X",
        dt[0], dt[1], dt[2], dt[3], dt[4], dt[5], dt[6], dt[7]);
     ILI9341_WriteString(5, y_pos, buffTFT, Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
   }
 }
+
 //----------------------------------------------------------
-void ds18b20_WriteScratchpad(uint8_t DevNum, uint8_t th, int8_t tl){   // ЗАПИСЬ в configuration register
- uint8_t i;
-  oneWire_Reset();          // 1 Wire Bus initialization
-  oneWire_WriteByte(0x55);  // Load MATCH ROM [55H] comand
-  for(i = 0; i < 8; i++){
-			oneWire_WriteByte(familycode[DevNum][i]);
-		}
-  oneWire_WriteByte(0x4E);  // Load WRITE SCRATCHPAD [4EH] command
-  oneWire_WriteByte(th);    // TH
-  oneWire_WriteByte(tl);    // TL
+void ds18b20_WriteScratchpad(uint8_t DevNum, uint8_t th, int8_t tl){
+  uint8_t i;
+  oneWire_Reset();
+  oneWire_WriteByte(0x55);  // MATCH ROM
+  for(i = 0; i < 8; i++){ oneWire_WriteByte(familycode[DevNum][i]); }
+  oneWire_WriteByte(0x4E);  // WRITE SCRATCHPAD
+  oneWire_WriteByte(th);
+  oneWire_WriteByte(tl);
   oneWire_WriteByte(0x7F);  // configuration register
-  oneWire_Reset();          // 1 Wire Bus initialization
-  oneWire_WriteByte(0xCC);  // Load Skip ROM [CCH] command
-  oneWire_WriteByte(0x48);  // Load COPY SCRATCHPAD [48h] command
+  oneWire_Reset();
+  oneWire_WriteByte(0xCC);  // SKIP ROM
+  oneWire_WriteByte(0x48);  // COPY SCRATCHPAD
 }
+
 //----------------------------------------------------------
 uint8_t dallas_crc8(uint8_t * data, uint8_t size){
- uint8_t crc = 0;
+  uint8_t crc = 0;
   for (uint8_t i = 0; i < size; ++i){
     uint8_t inbyte = data[i];
     for (uint8_t j = 0; j < 8; ++j){
       uint8_t mix = (crc ^ inbyte) & 0x01;
       crc >>= 1;
-      if ( mix ) crc ^= 0x8C;
+      if (mix) crc ^= 0x8C;
       inbyte >>= 1;
     }
   }
   return crc;
 }
+
 //----------------------------------------------------------
-/*
-  Name  : CRC-16 CCITT
-  Poly  : 0x1021    x^16 + x^12 + x^5 + 1
-  Init  : 0xFFFF
-  Revert: false
-  XorOut: 0x0000
-  Check : 0x29B1 ("123456789")
-  MaxLen: 4095 байт (32767 бит) - обнаружение
-    одинарных, двойных, тройных и всех нечетных ошибок
-*/
 uint16_t CRC16(uint8_t *pcBlock, uint16_t len){
   uint16_t crc = 0xFFFF;
   uint8_t i;
@@ -233,18 +230,18 @@ uint16_t CRC16(uint8_t *pcBlock, uint16_t len){
   }
   return crc;
 }
+
 //----------------------------------------------------------
 uint8_t ds18b20_GetSign(uint16_t dt){
-  //Проверим 11-й бит
-  if (dt&(1<<11)) return 1;
+  if (dt & (1 << 11)) return 1;
   else return 0;
 }
+
 //----------------------------------------------------------
 float ds18b20_Convert(uint16_t dt){
   float t;
-  t = (float) ((dt&0x07FF)>>4); //отборосим знаковые и дробные биты
-  //Прибавим дробную часть
-  t += (float)(dt&0x000F) / 16.0f;
+  t = (float)((dt & 0x07FF) >> 4);
+  t += (float)(dt & 0x000F) / 16.0f;
   return t;
 }
 
@@ -254,70 +251,71 @@ void temperature_check(){
   union {uint8_t data[8]; int16_t val[4];} buffer;
   int16_t valT;
   for (item=0; item < oneWire_amount;){
-    oneWire_Reset(); // 1 Wire Bus initialization
-    oneWire_WriteByte(0x55); // Load MATCH ROM [55H] comand
-    for (byte=0; byte < 8; byte++) oneWire_WriteByte(familycode[item][byte]); // Load cont. byte
-    oneWire_WriteByte(0xBE); // Read Scratchpad command [BE]
+    oneWire_Reset();
+    oneWire_WriteByte(0x55); // MATCH ROM
+    for (byte=0; byte < 8; byte++) oneWire_WriteByte(familycode[item][byte]);
+    oneWire_WriteByte(0xBE); // READ SCRATCHPAD
     for (byte=0; byte < 8; byte++){
-        buffer.data[byte] = oneWire_ReadByte(); // Read cont. byt
+        buffer.data[byte] = oneWire_ReadByte();
     }
-    crc = oneWire_ReadByte(); // Read CRC byte
-    byte = dallas_crc8(buffer.data, 8);
-    if (byte==crc){
+    crc = oneWire_ReadByte();
+    if (dallas_crc8(buffer.data, 8) == crc){
       try_cnt = 0;
       valT = buffer.val[0];
-      if (valT<0){
+      if (valT < 0){
         valT = -valT;
-        result[item] = valT*10/16;
-        result[item] = -result[0];
+        result[item] = -(valT * 10 / 16);
       }
-      else result[item] =  valT*10/16;
-//      crc = buffer.data[2]&TUNING;      // TUNING = 170 = 0xAA
-      if (buffer.data[2]==TUNING){correction[item] = buffer.data[3]; result[item] +=correction[item];}// корекция показаний датчика
+      else result[item] = valT * 10 / 16;
+      
+      if (buffer.data[2] == TUNING){
+          correction[item] = buffer.data[3];
+          result[item] += correction[item];
+      }
       else correction[item] = 0;
     }
-    else if (++try_cnt > 2) {try_cnt = 0; result[item] = 1990;};// (199) если ошибка более X раз то больше не опрашиваем 
-    if (try_cnt==0) item++;
-   }
+    else if (++try_cnt > 2) {
+        try_cnt = 0;
+        result[item] = 1990;
+    }
+    if (try_cnt == 0) item++;
+  }
   ds18b20_Convert_T();
 }
+
 //------- DHT-21 / DHT-11 ------------------------------------------
 uint8_t startDHT(uint8_t cn){
- int8_t status;
- int16_t flag=0;
-  if(cn) GPIOB->BSRR = GPIO_BSRR_BR10;                         //низкий уровень (Сбросили 10 бит порта B )
-  else GPIOB->BSRR = GPIO_BSRR_BR11;                           //низкий уровень (Сбросили 11 бит порта B )
-//#if DHT21==0
-//  HAL_Delay(30); // MCU Sends out Start Signal to DHT and pull down voltage for at least 18ms to let DHT11 detect the signal.
-//#else
-  HAL_Delay(5); // (20->55,5ms) MCU Sends out Start Signal to DHT and pull down voltage for at least 18ms to let DHT21 detect the signal.
-//#endif
-  if(cn) GPIOB->BSRR = GPIO_BSRR_BS10;                         //высокий уровень (Установили 10 бит порта B )
-  else GPIOB->BSRR = GPIO_BSRR_BS11;                           //высокий уровень (Установили 11 бит порта B )
-  DelayMicro(60);// wait for DHT respond 25uS
-  if(cn) status = (GPIOB->IDR & AM2301_IDR ? 1 : 0);           //проверяем уровень
-  else status = (GPIOB->IDR & OneWR_IDR ? 1 : 0);              //проверяем уровень
+  uint8_t status;
+  int16_t flag=0;
+  if(cn) DHT_LOW();
+  else ONEWIRE_LOW();
+  
+  HAL_Delay(5);
+  
+  if(cn) DHT_HIGH();
+  else ONEWIRE_HIGH();
+  
+  DelayMicro(60);
+  status = (cn ? DHT_READ() : ONEWIRE_READ()) ? 1 : 0;
+  
   if(!status){
-      while(!status){                                          // low-voltage-level response signal & keeps it for 80us
+      while(!status){
         flag++;
-//        result[0]=flag;
-        if(cn) status = (GPIOB->IDR & AM2301_IDR ? 1 : 0);     //проверяем уровень 10 бит порта B
-        else status = (GPIOB->IDR & OneWR_IDR ? 1 : 0);        //проверяем уровень 11 бит порта B
+        status = (cn ? DHT_READ() : ONEWIRE_READ()) ? 1 : 0;
+        if(flag > 1000) return 0; // Timeout
       }
-      if(flag<100) return 0;
-      else {          // hi-voltage-level response signal & keeps it for 80us (flag=55 Response to high time finished)
-        flag=0;
-        while(status){
-          flag++;
-//          result[1]=flag;
-          if(cn) status = (GPIOB->IDR & AM2301_IDR ? 1 : 0);     //проверяем уровень 10 бит порта B
-          else status = (GPIOB->IDR & OneWR_IDR ? 1 : 0);        //проверяем уровень 11 бит порта B
-        }
+      if(flag < 10) return 0;
+      
+      flag = 0;
+      while(status){
+        flag++;
+        status = (cn ? DHT_READ() : ONEWIRE_READ()) ? 1 : 0;
+        if(flag > 1000) return 0; // Timeout
       }
-      if(flag<200) return 0;
+      if(flag < 10) return 0;
       else return 1;
   }
-  else return 0;
+  return 0;
 }
 
 uint8_t readDHT(uint8_t cn){
@@ -327,43 +325,33 @@ uint8_t readDHT(uint8_t cn){
     for(i=0; i<5; i++){
        tem[i]=0;
        for(j=0; j<8; j++){
-          tem[i]<<= 1;
-//        delay_us(30);   // When DHT is sending data to MCU, every bit of data begins with the 50us low-voltage-level
-                          // and the length of the following high-voltage-level signal determines whether data bit is "0" or "1"         
-          if(cn) status = (AM2301_GPIO_Port->IDR & AM2301_IDR ? 1 : 0);     //проверяем уровень 10 бит порта B
-          else status = (AM2301_GPIO_Port->IDR & OneWR_IDR ? 1 : 0);        //проверяем уровень 11 бит порта B
-          while(!status){   // ожидаем фронт сигнала
-            flag++;
-            if(cn) status = (AM2301_GPIO_Port->IDR & AM2301_IDR ? 1 : 0);     //проверяем уровень 10 бит порта B
-            else status = (AM2301_GPIO_Port->IDR & OneWR_IDR ? 1 : 0);        //проверяем уровень 11 бит порта B
+          tem[i] <<= 1;
+          status = (cn ? DHT_READ() : ONEWIRE_READ()) ? 1 : 0;
+          while(!status){
+            status = (cn ? DHT_READ() : ONEWIRE_READ()) ? 1 : 0;
           }
-          DelayMicro(32);   //26-28u voltage-length means data "0" / 70u voltage-length means data "1"
-          flag=0;
-          if (cn) status = (AM2301_GPIO_Port->IDR & AM2301_IDR ? 1 : 0);     //проверяем уровень 10 бит порта B
-          else status = (AM2301_GPIO_Port->IDR & OneWR_IDR ? 1 : 0);         //проверяем уровень 11 бит порта B
-          while(status){// ожидаем спад сигнала
+          DelayMicro(32);
+          flag = 0;
+          status = (cn ? DHT_READ() : ONEWIRE_READ()) ? 1 : 0;
+          while(status){
             flag++;
-            if (cn) status = (AM2301_GPIO_Port->IDR & AM2301_IDR ? 1 : 0);     //проверяем уровень 10 бит порта B
-            else status = (AM2301_GPIO_Port->IDR & OneWR_IDR ? 1 : 0);         //проверяем уровень 11 бит порта B
+            status = (cn ? DHT_READ() : ONEWIRE_READ()) ? 1 : 0;
+            if(flag > 1000) break;
           }
-          if(flag>10) tem[i]|= 1;// data "1"
-        };
-    };
-    flag=tem[0]+tem[1]+tem[2]+tem[3];
-    if(flag==tem[4]){
-//  #if DHT21==0
-//      pvRH=(int)tem[0]*10; pvT[2]=(int)tem[2]*10;
-//  #else
-      pvRH =(int)tem[0]*256+tem[1]; pvT =(int)tem[2]*256+tem[3];
-//  #endif
-//     pvRH +=sp[0].spRH;                  // коррекция датчика влажности
+          if(flag > 10) tem[i] |= 1;
+       }
+    }
+    flag = tem[0] + tem[1] + tem[2] + tem[3];
+    if(flag == tem[4]){
+      pvRH = (int)tem[0] * 256 + tem[1];
+      pvT = (int)tem[2] * 256 + tem[3];
       err = 0;
-      if(pvRH>1000) pvRH=1000; else if (pvRH<0) pvRH=0;
+      if(pvRH > 1000) pvRH = 1000; else if (pvRH < 0) pvRH = 0;
       return 1;
     }
-    else if(++err>3) return 0;  // НЕ верная CRC датчика влажности  errors |=0x10;
+    else if(++err > 3) return 0;
  }
- return flag;     // потерян датчик влажности
+ return 0;
 }
 
 //------- DS2450 ------------------------------------------
@@ -371,71 +359,68 @@ void DS2450_check(){
   uint8_t item, byte, dev=0;
   union {uint8_t data[8]; uint16_t val[4];} bufferADC;
   for (item=0; item < oneWire_amount; item++){
-    if (familycode[item][0]==0x20){
-      oneWire_Reset(); // 1 Wire Bus initialization
-      oneWire_WriteByte(0x55); // Load MATCH ROM [55H] comand
-      for (byte=0; byte < 8; byte++) oneWire_WriteByte(familycode[item][byte]); // Load cont. byte
-      oneWire_WriteByte(0xAA); // “Read Memory” Command for DS2450 [AA]
-      oneWire_WriteByte(0x00); // Load TA1, beginning address
-      oneWire_WriteByte(0x00); // Load TA2, beginning address
+    if (familycode[item][0] == 0x20){
+      oneWire_Reset();
+      oneWire_WriteByte(0x55); // MATCH ROM
+      for (byte=0; byte < 8; byte++) oneWire_WriteByte(familycode[item][byte]);
+      oneWire_WriteByte(0xAA); // Read Memory
+      oneWire_WriteByte(0x00); // TA1
+      oneWire_WriteByte(0x00); // TA2
       for (byte=0; byte < 8; byte++){
-        bufferADC.data[byte] = oneWire_ReadByte(); // Read cont. byt
+        bufferADC.data[byte] = oneWire_ReadByte();
       }
-      byte = oneWire_ReadByte(); // Read byte LOW CRC16
-      byte = oneWire_ReadByte(); // Read byte HI CRC16
+      oneWire_ReadByte(); // CRC16 Low
+      oneWire_ReadByte(); // CRC16 High
       for (byte=0; byte < 4; byte++){
-        result[byte+dev*4] = (bufferADC.val[byte]>>8);
+        result[byte + dev * 4] = (bufferADC.val[byte] >> 8);
       }
       dev++;
     }
   }
-  oneWire_Reset(); // 1 Wire Bus initialization
-  oneWire_WriteByte(0xCC); // Load Skip ROM [CCH] command
-  oneWire_WriteByte(0x3C); // Load Convert T [3CH] command for DS2450
-  oneWire_WriteByte(0x0F); // Load select mask CH-D,CH-C,CH-B,CH-A
-  oneWire_WriteByte(0x55); // Load read-out control byte 0101 0101 (preset to all 0’s)
-//  oneWire_WriteByte(0xAA); // Load read-out control byte 0101 0101 (preset to all 1’s)
-  byte = oneWire_ReadByte(); // Read CRC16 byte
-  byte = oneWire_ReadByte(); // Read CRC16 byte
+  oneWire_Reset();
+  oneWire_WriteByte(0xCC); // SKIP ROM
+  oneWire_WriteByte(0x3C); // Convert ADC
+  oneWire_WriteByte(0x0F); // CH-D,C,B,A
+  oneWire_WriteByte(0x55); // control byte
+  oneWire_ReadByte(); // CRC16 Low
+  oneWire_ReadByte(); // CRC16 High
 }
 
 uint8_t DS2450_reset(){
   uint8_t j, item, byte, ok, setup=0;
   for (item=0; item < oneWire_amount; item++){
-     if (familycode[item][0]==0x20){
+     if (familycode[item][0] == 0x20){
         ok=0;
-        oneWire_Reset(); // 1 Wire Bus initialization
-        oneWire_WriteByte(0x55); // Load MATCH ROM [55H] comand
-        for (byte=0; byte < 8; byte++) oneWire_WriteByte(familycode[item][byte]); // Load cont. byte
-        oneWire_WriteByte(0x55); // “Write Memory” Command for DS2450 [55H]
-        oneWire_WriteByte(0x1C); // Load TA1, beginning address
-        oneWire_WriteByte(0x00); // Load TA2, beginning address (address=0x001C)
-        oneWire_WriteByte(0x40); // Load data byte (0x40) in address (0x001C) (the analog circuitry must be kept permanently active)
-        byte = oneWire_ReadByte(); // Read byte LOW CRC16
-        byte = oneWire_ReadByte(); // Read byte HI CRC16
-        byte = oneWire_ReadByte(); // read-back for simple verification (0x40)
-        if (byte==0x40) ok++;
-        oneWire_Reset(); // 1 Wire Bus initialization
-        oneWire_WriteByte(0x55); // Load MATCH ROM [55H] comand
-        for (byte=0; byte < 8; byte++) oneWire_WriteByte(familycode[item][byte]); // Load cont. byte
-        oneWire_WriteByte(0x55); // “Write Memory” Command for DS2450 [55H]
-        oneWire_WriteByte(0x08); // Load TA1, beginning address
-        oneWire_WriteByte(0x00); // Load TA2, beginning address (address=0x0008)
+        oneWire_Reset();
+        oneWire_WriteByte(0x55);
+        for (byte=0; byte < 8; byte++) oneWire_WriteByte(familycode[item][byte]);
+        oneWire_WriteByte(0x55); // Write Memory
+        oneWire_WriteByte(0x1C);
+        oneWire_WriteByte(0x00);
+        oneWire_WriteByte(0x40);
+        oneWire_ReadByte(); // CRC16 L
+        oneWire_ReadByte(); // CRC16 H
+        if (oneWire_ReadByte() == 0x40) ok++;
+        
+        oneWire_Reset();
+        oneWire_WriteByte(0x55);
+        for (byte=0; byte < 8; byte++) oneWire_WriteByte(familycode[item][byte]);
+        oneWire_WriteByte(0x55); // Write Memory
+        oneWire_WriteByte(0x08);
+        oneWire_WriteByte(0x00);
         for (j=0; j < 4; j++){
-           oneWire_WriteByte(0x08);   // Load data byte (0x08) in address (0x0008+2j) ([8] number of bits to be converted)
-           byte = oneWire_ReadByte(); // Read byte LOW CRC16
-           byte = oneWire_ReadByte(); // Read byte HI CRC16
-           byte = oneWire_ReadByte(); // read-back for simple verification (0x08)
-           if (byte==0x08) ok++;
+           oneWire_WriteByte(0x08); // 8-bit resolution
+           oneWire_ReadByte(); // CRC16 L
+           oneWire_ReadByte(); // CRC16 H
+           if (oneWire_ReadByte() == 0x08) ok++;
            
-           oneWire_WriteByte(0x00);   // Load data byte (0x00) in address (0x0009+2j) (Setting IR to 0 [2.56V])/(Setting IR to 1 [5.12V])
-           byte = oneWire_ReadByte(); // Read byte LOW CRC16
-           byte = oneWire_ReadByte(); // Read byte HI CRC16
-           byte = oneWire_ReadByte(); // read-back for simple verification (0x00)
-           if (byte==0x00) ok++;
-          };
-        if (ok==9) setup++;
-      };
-   };
+           oneWire_WriteByte(0x00); // 2.56V range
+           oneWire_ReadByte(); // CRC16 L
+           oneWire_ReadByte(); // CRC16 H
+           if (oneWire_ReadByte() == 0x00) ok++;
+        }
+        if (ok == 9) setup++;
+     }
+  }
   return setup;
 }

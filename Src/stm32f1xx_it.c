@@ -60,7 +60,8 @@ extern RTC_HandleTypeDef hrtc;
 extern TIM_HandleTypeDef htim1;
 extern TIM_HandleTypeDef htim2;
 /* USER CODE BEGIN EV */
-extern uint8_t show, showADC, secTick, resetDispl, displ_num, newButt;
+extern volatile uint8_t show, showADC, secTick, displ_num, newButt;
+extern volatile int8_t resetDispl;
 /* USER CODE END EV */
 
 /******************************************************************************/

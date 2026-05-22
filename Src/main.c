@@ -60,11 +60,13 @@ TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
-const float A1=1.6, A2=0.64, A3=0.04;  // порядок a=0.8 (A1=2a; A2=a^2; A3=(1-a)^2)
+const float A1=1.6, A2=0.64, A3=0.04;  // пїЅпїЅпїЅпїЅпїЅпїЅпїЅ a=0.8 (A1=2a; A2=a^2; A3=(1-a)^2)
 char txt[10], buffTFT[60];
-uint8_t displ_num=0, newButt=1, ticTimer, ticTouch, show, showADC, Y_txt=5, X_left=5, Y_top, Y_bottom=ILI9341_HEIGHT-22, buttonAmount, secTick, scale=1;
+volatile uint8_t displ_num=0, newButt=1, ticTimer, ticTouch, show, showADC, Y_txt=5, X_left=5, Y_top, Y_bottom=ILI9341_HEIGHT-22, buttonAmount, secTick, scale=1;
 uint8_t noname, fc20H, fc28H, familycode[MAX_DEVICE][8]={0};
-int8_t oneWire_amount, dht_amount, ds18b20_num, ds2450_num, numSet=0, numDate=0, newDate=0, resetDispl=0, newcorrection, correction[MAX_DEVICE];
+int8_t oneWire_amount, dht_amount, ds18b20_num, ds2450_num, numSet=0, numDate=0, newDate=0;
+volatile int8_t resetDispl=0;
+int8_t newcorrection, correction[MAX_DEVICE];
 int16_t result[MAX_DEVICE]={199}, max_t, min_t, midl_t, val_t, pvT, pvRH;
 uint16_t touch_x, touch_y;
 uint16_t fillScreen = ILI9341_BLACK;
@@ -92,10 +94,10 @@ void home_screen(void);
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
   if(htim->Instance == TIM1){ //check if the interrupt comes from TIM1 (10 ms)
     checkButt++;
-    if (ticTouch){ --ticTouch; HAL_GPIO_WritePin(Touch_GPIO_Port, Touch_Pin, GPIO_PIN_SET);}// индикация нажатия
+    if (ticTouch){ --ticTouch; HAL_GPIO_WritePin(Touch_GPIO_Port, Touch_Pin, GPIO_PIN_SET);}// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
     else {HAL_GPIO_WritePin(Touch_GPIO_Port, Touch_Pin, GPIO_PIN_RESET);}
 //    if (ticTimer){ --ticTimer;
-//      if (set[3]&1) HAL_GPIO_WritePin(Alarm_GPIO_Port, Alarm_Pin, GPIO_PIN_SET); // включить тревогу
+//      if (set[3]&1) HAL_GPIO_WritePin(Alarm_GPIO_Port, Alarm_Pin, GPIO_PIN_SET); // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 //    }
 //    else HAL_GPIO_WritePin(Alarm_GPIO_Port, Alarm_Pin, GPIO_PIN_RESET);
   }
@@ -147,72 +149,76 @@ int main(void)
   MX_ADC1_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-//------------------------------------- Локальные переменные -----------
+  // Enable DWT
+  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+  DWT->CYCCNT = 0;
+  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+  //-------------------------------------   -----------
   uint8_t item;
   uint16_t adcVal;
   float uVal;
-//------------------------------------- Запуск прерываний -----------
-  HAL_TIM_Base_Start_IT(&htim1);          /* ------  таймер 100Гц.  период  10 мс.  ----*/
-  HAL_TIM_Base_Start_IT(&htim2);          /* ------  таймер  5Гц.   период 200 мс.  ----*/
+//------------------------------------- пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ -----------
+  HAL_TIM_Base_Start_IT(&htim1);          /* ------  пїЅпїЅпїЅпїЅпїЅпїЅ 100пїЅпїЅ.  пїЅпїЅпїЅпїЅпїЅпїЅ  10 пїЅпїЅ.  ----*/
+  HAL_TIM_Base_Start_IT(&htim2);          /* ------  пїЅпїЅпїЅпїЅпїЅпїЅ  5пїЅпїЅ.   пїЅпїЅпїЅпїЅпїЅпїЅ 200 пїЅпїЅ.  ----*/
   HAL_RTCEx_SetSecond_IT(&hrtc);          // Sets Interrupt for second
-  HAL_ADCEx_Calibration_Start(&hadc1);    // калибровкa АЦП
+  HAL_ADCEx_Calibration_Start(&hadc1);    // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅa пїЅпїЅпїЅ
 //  HAL_GPIO_WritePin(GPIOA, Alarm_Pin, GPIO_PIN_SET);  // LED_PC13=OFF
 
   TFT_init();
-  home_screen();                      // проверка подключенных датчиков
-  ILI9341_FillScreen(fillScreen);     // ОЧИСТКА экрана
+  home_screen();                      // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+  ILI9341_FillScreen(fillScreen);     // пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   secTick = 0;
   show = 0;
-//  MX_IWDG_Init();                 // инициализация Watchdog (3 сек.)
+//  MX_IWDG_Init();                 // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ Watchdog (3 пїЅпїЅпїЅ.)
   while (1){
-//    HAL_IWDG_Refresh(&hiwdg);     // обновление Watchdog
+//    HAL_IWDG_Refresh(&hiwdg);     // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ Watchdog
     Y_txt = 5; X_left = 5;        // Y_top = Y_txt;
     if(fc20H){                    // DS2450
-        //------------------------------------- ТАЧСКРИН ---------------------------
+        //------------------------------------- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ ---------------------------
         if (ILI9341_TouchPressed()&& checkButt>40){
 //          ILI9341_WriteString(X_left, Y_bottom - 22, "TouchPressed!", Font_11x18, ILI9341_MAGENTA, fillScreen);
           if(ILI9341_TouchGetCoordinates(&touch_x, &touch_y)){
               for (item=0; item<buttonAmount; item++){
-                  if(contains(touch_x, touch_y, item)) break; // проверка попадания новой координаты в область кнопки
+                  if(contains(touch_x, touch_y, item)) break; // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
               }
-              checkButtons_ADC(item); // проверка нажатой кнопки               
-              displADC();     // отображение информации АЦП
+              checkButtons_ADC(item); // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ               
+              displADC();     // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ
           }
           checkButt = 0;
         }
         if(showADC){
             showADC = 0;
             DS2450_check();
-            displADC();     // отображение информации АЦП 
+            displADC();     // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ 
         }
     }
     else if(show){
         show = 0;
 //        HAL_GPIO_TogglePin(GPIOA, Alarm_Pin);  // LED_PC13=TogglePin
         if(fc28H){                        // DS18b20
-            //------------------------------------- ТАЧСКРИН ---------------------------
+            //------------------------------------- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ ---------------------------
             if(ILI9341_TouchPressed()&& checkButt>40){
               //ILI9341_WriteString(X_left, Y_bottom - 22, "TouchPressed!", Font_11x18, ILI9341_MAGENTA, fillScreen);
               if(ILI9341_TouchGetCoordinates(&touch_x, &touch_y)){
                   for (item=0; item<buttonAmount; item++){
-                      if(contains(touch_x, touch_y, item)) break; // проверка попадания новой координаты в область кнопки
+                      if(contains(touch_x, touch_y, item)) break; // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
                   }
-                  checkButtons_as(item); // проверка нажатой кнопки               
+                  checkButtons_as(item); // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ               
                   if (displ_num) resetDispl=60; else resetDispl = 0;
               }
               checkButt = 0;
             }
-            //------------------------------------- ОСНОВНОЙ экран ---------------------------
+            //------------------------------------- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ ---------------------------
             //-------- show, secTick are changed in function handles RTC global interrupt -> {void RTC_IRQHandler(void)} in file "stm32f1xx_it.c"
-            temperature_check();  // измерение температуры
-            display_as();         // отображение информации
+            temperature_check();  // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+            display_as();         // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         }
         else {
-            item = readDHT(0);        // DHT-21 подключен по линии 1 Wire
+            item = readDHT(0);        // DHT-21 пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ 1 Wire
             if(item){
                 sprintf(buffTFT,"1Wt=%.1f  Rh=%.1f%% ",(float)pvT/10,(float)pvRH/10);
                 ILI9341_WriteString(5, Y_txt, buffTFT, Font_16x26, ILI9341_CYAN, ILI9341_BLACK);
@@ -220,7 +226,7 @@ int main(void)
             }
         }
         if(fc28H < 9 && displ_num == 0){
-            item = readDHT(1);            // DHT-21 подключен по линии AM2301
+            item = readDHT(1);            // DHT-21 пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ AM2301
             if (item){
               sprintf(buffTFT,"Amt=%.1f  Rh=%.1f%% ",(float)pvT/10,(float)pvRH/10);
               ILI9341_WriteString(5, Y_txt, buffTFT, Font_16x26, ILI9341_CYAN, ILI9341_BLACK);
@@ -249,11 +255,11 @@ int main(void)
             }
             if(fc28H==0){
               ILI9341_FillRectangle(42, 98, 100, 22, ILI9341_BLACK);
-              ILI9341_WriteString(45, 100, "Датчикыв не знайдено!", Font_11x18, ILI9341_RED, ILI9341_BLACK);
+              ILI9341_WriteString(45, 100, "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ!", Font_11x18, ILI9341_RED, ILI9341_BLACK);
               Y_txt = Y_txt+18+5;
               HAL_Delay(700);
               ILI9341_FillScreen(fillScreen);
-              oneWire_count(MAX_DEVICE);       // проверяем наличие датчиков если item = 0 датчики найдены
+              oneWire_count(MAX_DEVICE);       // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ item = 0 пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
               if(fc28H) newButt = 1;
             }
         }
